@@ -1,0 +1,40 @@
+---
+- name: Cleanup awx
+  hosts: awx
+  tasks:
+    - name: deploy initial tower cli config file
+      copy:
+        content: |
+                 [general]
+                 host = {{ awx_host_url }}
+                 username = admin
+                 password = password
+                 verify_ssl = {{ awx_ssl_verify }}
+        dest: "{{ awx_config }}"
+        owner: root
+        group: root
+        mode: 0600
+
+    - name: remove default organization
+      shell: tower-cli organization delete --name "Default" --insecure
+      register: result
+      changed_when: result.stdout | search("true")
+      run_once: yes
+
+    - name: remove demo project
+      shell: tower-cli project delete --name "Demo Project" --insecure
+      register: result
+      changed_when: result.stdout | search("true")
+      run_once: yes
+
+    - name: remove demo credential
+      shell: tower-cli credential delete --name "Demo Credential" --insecure
+      register: result
+      changed_when: result.stdout | search("true")
+      run_once: yes
+
+    - name: remove demo job template
+      shell: tower-cli job_template delete --name "Demo Job Template" --insecure
+      register: result
+      changed_when: result.stdout | search("true")
+      run_once: yes

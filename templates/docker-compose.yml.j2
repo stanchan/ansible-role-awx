@@ -1,0 +1,146 @@
+#jinja2: lstrip_blocks: True
+version: "3"
+services:
+{% if postgres_hostname is not defined %}
+  postgres:
+    image: "{{ postgresql_image }}"
+    container_name: awx_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: {{ postgres_user }}
+      POSTGRES_PASSWORD: {{ postgres_password }}
+      POSTGRES_DB: {{ postgres_db }}
+      PGDATA: "/var/lib/postgresql/data/pgdata"
+    volumes:
+      - "{{ postgres_data_dir }}:/var/lib/postgresql/data:Z"
+    networks:
+      {{ awx_network }}:
+        aliases:
+          - postgres
+{% endif %}
+  rabbitmq:
+    image: "{{ rabbitmq_image }}"
+    container_name: awx_rabbitmq
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_VHOST: {{ rabbitmq_vhost }}
+      RABBITMQ_DEFAULT_USER: {{ rabbitmq_user }}
+      RABBITMQ_DEFAULT_PASS: {{ rabbitmq_password }}
+      RABBITMQ_ERLANG_COOKIE: {{ rabbitmq_erlang_cookie }}
+    networks:
+      {{ awx_network }}:
+        aliases:
+          - rabbitmq
+  memcached:
+    image: "{{ memcached_image}}"
+    container_name: awx_memcached
+    restart: unless-stopped
+    networks:
+      {{ awx_network }}:
+        aliases:
+          - memcached
+  web:
+    image: "{{ awx_web_docker_image }}"
+    container_name: awx_web
+    restart: unless-stopped
+    hostname: "{{ awx_web_hostname }}"
+    depends_on:
+      - rabbitmq
+      - memcached
+      {% if postgres_hostname is not defined %}
+      - postgres
+      {% endif %}
+    ports:
+      - "{{ awx_host_port }}:8052"
+    hostname: awxweb
+{% if awx_dns_servers | default([]) %}
+    dns:
+{% for host in awx_dns_servers %}
+      - {{ host }}
+{% endfor %}
+{% endif %}
+{% if awx_search_domains | default([]) %}
+    dns_search:
+{% for domain in awx_search_domains %}
+      - {{ domain }}
+{% endfor %}
+{% endif %}
+{% if awx_extra_hosts | default([]) %}
+    extra_hosts:
+{% for host in awx_extra_hosts %}
+      - {{ host }}
+{% endfor %}
+{% endif %}
+    user: root
+    environment:
+      http_proxy: "{{ http_proxy | default('') }}"
+      https_proxy: "{{ https_proxy | default('') }}"
+      no_proxy: "{{ no_proxy | default('') }}"
+    volumes:
+      - "{{ awx_docker_compose_dir }}/SECRET_KEY:/etc/tower/SECRET_KEY"
+      - "{{ awx_docker_compose_dir }}/environment.sh:/etc/tower/conf.d/environment.sh"
+      - "{{ awx_docker_compose_dir }}/credentials.py:/etc/tower/conf.d/credentials.py"
+{% if awx_project_data_dir is defined %}
+      - "{{ awx_project_data_dir +':/var/lib/awx/projects:rw' }}"
+{% endif %}
+{% if ca_trust_dir is defined %}
+      - "{{ ca_trust_dir +':/etc/pki/ca-trust/source/anchors:ro' }}"
+{% endif %}
+    networks:
+      {{ awx_network }}:
+        aliases:
+          - awx_web
+          - awxweb
+  task:
+    image: "{{ awx_task_docker_image }}"
+    container_name: awx_task
+    restart: unless-stopped
+    hostname: "{{ awx_task_hostname }}"
+    depends_on:
+      - rabbitmq
+      - memcached
+      - web
+      {% if pg_hostname is not defined %}
+      - postgres
+      {% endif %}
+{% if awx_dns_servers | default([]) %}
+    dns:
+{% for host in awx_dns_servers %}
+      - {{ host }}
+{% endfor %}
+{% endif %}
+{% if awx_search_domains | default([]) %}
+    dns_search:
+{% for domain in awx_search_domains %}
+      - {{ domain }}
+{% endfor %}
+{% endif %}
+{% if awx_extra_hosts | default([]) %}
+    extra_hosts:
+{% for host in awx_extra_hosts %}
+      - {{ host }}
+{% endfor %}
+{% endif %}
+    user: root
+    environment:
+      http_proxy: "{{ http_proxy | default('') }}"
+      https_proxy: "{{ https_proxy | default('') }}"
+      no_proxy: "{{ no_proxy | default('') }}"
+    volumes:
+      - "{{ awx_docker_compose_dir }}/SECRET_KEY:/etc/tower/SECRET_KEY"
+      - "{{ awx_docker_compose_dir }}/environment.sh:/etc/tower/conf.d/environment.sh"
+      - "{{ awx_docker_compose_dir }}/credentials.py:/etc/tower/conf.d/credentials.py"
+{% if awx_project_data_dir is defined %}
+      - "{{ awx_project_data_dir +':/var/lib/awx/projects:rw' }}"
+{% endif %}
+{% if ca_trust_dir is defined %}
+      - "{{ ca_trust_dir +':/etc/pki/ca-trust/source/anchors:ro' }}"
+{% endif %}
+    networks:
+      {{ awx_network }}:
+        aliases:
+          - awx
+
+networks:
+  {{ awx_network }}:
+    driver: {{ awx_network_type }}

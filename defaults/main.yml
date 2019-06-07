@@ -1,0 +1,178 @@
+---
+# defaults file for awx
+pip_packages:
+  - name: jmespath
+    version: latest
+  - name: cffi
+    version: latest
+  - name: setuptools
+    version: latest
+  - name: PyYAML
+    version: latest
+  - name: ansible
+    version: latest
+  - name: ansible-vault
+    version: latest
+  - name: ansible-tower-cli
+    version: "{{ awx_cli_version }}"
+
+awx_version: 4.0.0
+awx_cli_version: 3.3.4
+awx_dockerhub_base: uberdeploy
+awx_web_hostname: awxweb
+awx_web_docker_image: "{{ awx_dockerhub_base }}/awx_web:{{ awx_version }}"
+awx_task_hostname: awx
+awx_task_docker_image: "{{ awx_dockerhub_base }}/awx_task:{{ awx_version }}"
+
+awx_host: awxhost.shift-labs.com
+awx_host_port: 8052
+awx_host_url: "http://{{ awx_host }}:{{ awx_host_port }}"
+
+awx_network: default
+awx_network_type: bridge
+
+rabbitmq_version: 3.7.4
+rabbitmq_image: "ansible/awx_rabbitmq:{{rabbitmq_version}}"
+rabbitmq_host: rabbitmq
+rabbitmq_vhost: awx
+rabbitmq_port: 5672
+rabbitmq_user: guest
+rabbitmq_password: guest
+rabbitmq_erlang_cookie: cookiemonster
+
+memcached_image: "memcached:alpine"
+memcached_host: memcached
+memcached_port: 11211
+
+postgresql_version: 9.6
+postgresql_image: "postgres:{{postgresql_version}}"
+postgres_user: awx
+postgres_password: password
+postgres_db: awx
+postgres_host: postgres
+postgres_port: 5432
+postgres_data_dir: /srv/awx/postgres
+
+host_port: 80
+#ssl_certificate:
+
+awx_docker_compose_dir: /srv/docker-awx
+awx_admin_user: admin
+awx_admin_password: password
+awx_secret_key: awxsecret
+awx_ssl_verify: yes
+awx_search_domains:
+  - shift-labs.com
+
+awx_project_data_dir: /var/lib/awx/projects
+#awx_ca_trust_dir: /etc/pki/ca-trust/source/anchors
+awx_config: /root/.tower_cli.cfg
+awx_inventory_dir: "{{ awx_project_data_dir }}/inventory"
+awx_default_attributes_file: "{{ awx_inventory_dir }}/default_attributes.yml"
+
+create_preload_data: yes
+
+awx_orgs:
+  Demo:
+    name: Demo
+    description: Demo organization
+    state: present
+
+awx_teams:
+  Development:
+    name: Development
+    description: Development team
+    organization: Demo
+    state: present
+
+awx_users:
+  - username: demo
+    password: password
+    first_name: Demo
+    last_name: User
+    superuser: true
+    email: demo@shift-labs.com
+    teams:
+      - Development
+    state: present
+
+awx_projects:
+  - name: stanchan_awx-demo
+    description: stanchan_awx-demo project
+    organization: Demo
+    scm_type: git
+    scm_branch: master
+    scm_update_on_launch: true
+    scm_url: https://github.com/stanchan/awx-demo.git
+    state: present
+
+awx_inventory_defaults:
+  ansible_become: true
+  become_method: ssh
+
+awx_inventory_scripts:
+  - name: teleport_production
+    description: teleport_production inventory script
+    organization: Demo
+    script: |
+      #!/bin/bash
+      tsh -i ~/.ssh/id_rsa --proxy={{ teleport_proxy_host }}:{{ teleport_proxy_web_listen_address.split(':')[1] }} --user={{ teleport_awx_user }} ls --format=json \"\$@\"
+
+awx_inventory:
+  - name: Demo_scm_awx-demo
+    description: Demo_scm_awx-demo inventory
+    organization: Demo
+    sources:
+      - name: production
+        description: production inventory
+        source: scm
+        source_project: stanchan_awx-demo
+        source_path: inventory/production/hosts
+    state: present
+  - name: Demo_teleport_awx-demo
+    description: Demo_teleport_awx-demo inventory
+    organization: Demo
+    sources:
+      - name: production
+        description: production inventory
+        source: custom
+        source_script: teleport_production
+    state: present
+  - name: Demo_production_awx-demo
+    description: Demo_production_awx-demo inventory
+    organization: Demo
+    groups:
+      - awx
+      - docker
+    state: present
+
+awx_inventory_hosts:
+  - name: Demo_production_awx-demo awx
+    inventory: Demo_production_awx-demo
+    group: awx
+    group_items: "{{ groups['awx']}}"
+    enabled: yes
+    state: present
+  - name: Demo_production_awx-demo docker
+    inventory: Demo_production_awx-demo
+    group: docker
+    group_items: "{{ groups['docker']}}"
+    enabled: yes
+    state: present
+
+awx_credentials:
+  - name: github_stanchan
+    credential_type: "Source Control"
+    description: github_stanchan credential
+    team: Development
+    state: present
+
+awx_job_templates:
+  - name: awx-demo_run
+    description: awx-demo_run job
+    job_type: run
+    inventory: Demo_production_awx-demo
+    project: stanchan_awx-demo
+    playbook: demo.yml
+    use_fact_cache: yes
+    state: present

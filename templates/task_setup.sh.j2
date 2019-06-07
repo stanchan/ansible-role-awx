@@ -1,0 +1,74 @@
+#!/bin/bash
+export AWX_HOME=/var/lib/awx
+
+yum install wget -y
+wget {% if not awx_ssl_verify %}--no-check-certificate{% endif %} {{ teleport_tsh_bin_url }} -O /usr/local/bin/tsh
+chmod 755 /usr/local/bin/tsh
+
+[[ ! -d ${AWX_HOME}/.ssh ]] && mkdir ${AWX_HOME}/.ssh
+[[ ! -d ${AWX_HOME}/.tsh ]] && mkdir ${AWX_HOME}/.tsh
+chmod 700 ${AWX_HOME}/.ssh
+chmod 700 ${AWX_HOME}/.tsh
+
+cat <<EOF > ${AWX_HOME}/.ssh/config
+Host *
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+
+Host {{ teleport_proxy_host }}
+    HostName {{ hostvars[groups['teleport-auth'][0]]['ansible_default_ipv4']['address'] }}
+    Port 3023
+
+Host *.{{ teleport_domain }}
+    HostName %h
+    Port 3022
+    ProxyCommand ssh -p 3023 %r@{{ teleport_proxy_host.split('.')[0] }} -s proxy:%h:%p
+EOF
+cat <<EOF > ${AWX_HOME}/.ssh/id_rsa
+{{ hostvars[groups['teleport-auth'][0]]['teleport_awx_key'] }}
+EOF
+chmod 600 ${AWX_HOME}/.ssh/id_rsa
+cat <<EOF > ${AWX_HOME}/.ssh/id_rsa-cert.pub
+{{ hostvars[groups['teleport-auth'][0]]['teleport_awx_cert'] }}
+EOF
+cat <<EOF > ${AWX_HOME}/.ssh/known_hosts
+{{ hostvars[groups['teleport-auth'][0]]['cluster_node_keys'] }}
+EOF
+cat <<EOF > ${AWX_HOME}/.tsh/known_hosts
+{{ hostvars[groups['teleport-auth'][0]]['cluster_node_keys'] }}
+EOF
+
+cat <<EOF > ${AWX_HOME}/.tsh/profile
+proxy_host: {{ teleport_proxy_host }}
+proxy_port: 3023
+proxy_web_port: 3080
+user: awx
+EOF
+
+[[ ! -d /root/.ssh ]] && mkdir /root/.ssh
+[[ ! -d /root/.tsh ]] && mkdir /root/.tsh
+chmod 700 /root/.ssh
+chmod 700 /root/.tsh
+
+cat <<EOF > /root/.ssh/id_rsa
+{{ hostvars[groups['teleport-auth'][0]]['teleport_awx_key'] }}
+EOF
+chmod 600 /root/.ssh/id_rsa
+cat <<EOF > /root/.ssh/id_rsa-cert.pub
+{{ hostvars[groups['teleport-auth'][0]]['teleport_awx_cert'] }}
+EOF
+
+cat <<EOF > /root/.ssh/known_hosts
+{{ hostvars[groups['teleport-auth'][0]]['cluster_node_keys'] }}
+EOF
+
+cat <<EOF > /root/.tsh/known_hosts
+{{ hostvars[groups['teleport-auth'][0]]['cluster_node_keys'] }}
+EOF
+
+cat <<EOF > /root/.tsh/profile
+proxy_host: {{ teleport_proxy_host }}
+proxy_port: 3023
+proxy_web_port: 3080
+user: awx
+EOF

@@ -1,0 +1,76 @@
+---
+- name: get awx user configs
+  hosts: "{{ groups['teleport-auth'][0] }}"
+  vars:
+    teleport_awx_user: awx
+    teleport_awx_pem_file: /root/awx.pem
+    teleport_awx_rekey: yes
+    teleport_token_ttl: 87600h
+  tasks:
+    - name: Wait 300 seconds for port 3080 to become open on the host
+      wait_for:
+        port: 3080
+
+    - name: get cluster_node_keys
+      shell: "tctl auth export --type=host"
+      run_once: yes
+      ignore_errors: yes
+      register: results
+
+    - set_fact:
+        cluster_node_keys: "{{ results.stdout }}"
+      ignore_errors: yes
+
+    - name: check awx user pem
+      stat:
+        path: "{{ teleport_awx_pem_file }}"
+      register: awx_pem_check
+
+    - name: create awx user pem
+      shell: "tctl auth sign --ttl={{ teleport_token_ttl }} --user={{ teleport_awx_user }} --out={{ teleport_awx_pem_file }}"
+      run_once: yes
+      ignore_errors: yes
+      register: results
+      when: not awx_pem_check.stat.exists or teleport_awx_rekey
+
+    - name: get awx user pem
+      slurp:
+        src: "{{ teleport_awx_pem_file }}"
+      register: pem_key
+
+    - set_fact:
+        teleport_awx_key: "{{ pem_key['content'] | b64decode | regex_search(regexp, '\\1') | first }}"
+        teleport_awx_cert: "{{ pem_key['content'] | b64decode | regex_search(regexp, '\\2') | first }}"
+      vars:
+        regexp: '(?s)(.*END.*?)\n(ssh-rsa-cert.*)\n$'
+      ignore_errors: yes
+
+- name: setup awx task containers
+  hosts: awx-task
+  vars:
+    awx_task_script_file: /tmp/task_setup.sh
+    awx_task_container_name: dockerawx_awx_task_1
+  tasks:
+    - name: deploy setup.sh to docker host
+      template:
+        src: task_setup.sh.j2
+        dest: "{{ awx_task_script_file }}"
+        owner: root
+        group: root
+        mode: 0700
+
+    - name: copy task_setup.sh to awx-task containers
+      shell: "docker cp {{ awx_task_script_file }} {{ awx_task_container_name }}:{{ awx_task_script_file | dirname}}/"
+
+    - name: run task_setup.sh in awx-task containers
+      docker_exec:
+        name: "{{ awx_task_container_name }}"
+        command: "sh {{ awx_task_script_file }}"
+        docker_host: unix:///var/run/docker.sock
+      register: exec_output
+
+    - name: remove task_setup.sh in awx-task containers
+      shell: "docker exec {{ awx_task_container_name }} rm -f {{ awx_task_script_file }}"
+
+    - debug:
+        var: exec_output

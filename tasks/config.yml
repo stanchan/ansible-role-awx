@@ -1,0 +1,286 @@
+---
+- name: Configure awx
+  hosts: awx
+  vars:
+    awx_bootstrap: yes
+  tasks:
+    - name: change default awx admin password
+      tower_user:
+        username: "{{ awx_admin_user }}"
+        password: "{{ awx_admin_password }}"
+        email: "noreply@chanfx.com"
+        first_name: Admin
+        last_name: Account
+        superuser: True
+        state: present
+        tower_host: "{{ awx_host_url }}"
+        tower_verify_ssl: "{{ awx_ssl_verify }}"
+        tower_username: admin
+        tower_password: password
+      run_once: yes
+      ignore_errors: yes
+
+    - name: deploy tower cli config file
+      template:
+        src: tower_cli.cfg.j2
+        dest: "{{ awx_config }}"
+        owner: root
+        group: root
+        mode: 0600
+
+    - name: create organizations
+      tower_organization:
+        name: "{{ item.value.name }}"
+        description: "{{ item.value.description }}"
+        state: "{{ item.value.state }}"
+        tower_host: "{{ awx_host_url }}"
+        tower_verify_ssl: "{{ awx_ssl_verify }}"
+        tower_username: "{{ awx_admin_user }}"
+        tower_password: "{{ awx_admin_password }}"
+      with_dict: "{{ awx_orgs }}"
+      run_once: yes
+
+    - name: create teams
+      tower_team:
+        name: "{{ item.value.name }}"
+        description: "{{ item.value.description }}"
+        organization: "{{ item.value.organization }}"
+        state: "{{ item.value.state }}"
+        tower_host: "{{ awx_host_url }}"
+        tower_verify_ssl: "{{ awx_ssl_verify }}"
+        tower_username: "{{ awx_admin_user }}"
+        tower_password: "{{ awx_admin_password }}"
+      with_dict: "{{ awx_teams }}"
+      run_once: yes
+
+    - name: create users
+      tower_user:
+        email: "{{ item.email }}"
+        username: "{{ item.username|default(omit) }}"
+        password: "{{ item.password|default(omit) }}"
+        first_name: "{{ item.first_name|default(omit) }}"
+        last_name: "{{ item.last_name|default(omit) }}"
+        superuser: "{{ item.superuser|default(omit) }}"
+        state: "{{ item.state }}"
+        tower_host: "{{ awx_host_url }}"
+        tower_verify_ssl: "{{ awx_ssl_verify }}"
+        tower_username: "{{ awx_admin_user }}"
+        tower_password: "{{ awx_admin_password }}"
+      with_items: "{{ awx_users }}"
+      no_log: yes
+      run_once: yes
+
+    - name: assign users to teams
+      shell: awx-cli user list --username  {{ item.username }}
+      with_items: "{{ awx_users }}"
+      register: list_user_result
+      failed_when: list_user_result.stdout | match("No records found.")
+      changed_when: yes
+      no_log: yes
+      run_once: yes
+
+    - name: assign users to teams
+      shell: tower-cli team associate --team "{{ item.1 }}" --user "{{ item.0.username }}"
+      with_subelements:
+        - "{{ awx_users }}"
+        - teams
+      register: result
+      changed_when: result.stdout | search("true")
+      no_log: yes
+      run_once: yes
+
+    - name: create "Machine" credentials
+      shell: "tower-cli credential create --name=\"{{ item.name }}\" --team=\"{{ item.team }}\" --credential-type=\"{{ item.credential_type }}\" --inputs=\"username: {{ item.username }}\nssh_key_data: |\n{{ item.ssh_key_data | regex_replace('^', '  ') | regex_replace('\\n', '\\n  ') }}\""
+      with_items:
+        - "{{ awx_credentials }}"
+      register: result
+      changed_when: result.stdout | search("true")
+      run_once: yes
+      no_log: yes
+      when: item.credential_type == "Machine"
+
+    - name: create "Source Control" credentials
+      shell: "tower-cli credential create --name=\"{{ item.name }}\" --team=\"{{ item.team }}\" --credential-type=\"{{ item.credential_type }}\"{% if item.ssh_key_data is defined %} --inputs=\"ssh_key_data: |\n{{ item.ssh_key_data | regex_replace('^', '  ') | regex_replace('\\n', '\\n  ') }}\"{% endif %}"
+      with_items:
+        - "{{ awx_credentials }}"
+      register: result
+      changed_when: result.stdout | search("true")
+      run_once: yes
+      no_log: yes
+      when: item.credential_type == "Source Control"
+
+    - name: create "Vault" credentials
+      shell: "tower-cli credential create --name=\"{{ item.name }}\" --team=\"{{ item.team }}\" --credential-type=\"{{ item.credential_type }}\" --inputs=\"vault_password: {{ item.vault_password }}\""
+      with_items:
+        - "{{ awx_credentials }}"
+      register: result
+      changed_when: result.stdout | search("true")
+      run_once: yes
+      no_log: yes
+      when: item.credential_type == "Vault"
+
+    - name: create projects
+      awx_project:
+        name: "{{ item.name }}"
+        state: "{{ item.state }}"
+        description: "{{ item.description|default(omit) }}"
+        organization: "{{ item.organization|default(omit) }}"
+        scm_type: "{{ item.scm_type|default(omit) }}"
+        scm_credential: "{{ item.scm_credential|default(omit) }}"
+        scm_branch: "{{ item.scm_branch|default(omit) }}"
+        scm_update_on_launch: "{{ item.scm_update_on_launch|default(omit) }}"
+        scm_url: "{{ item.scm_url|default(omit) }}"
+        local_path: "{{ item.local_path|default(omit) }}"
+        tower_host: "{{ awx_host_url }}"
+        tower_username: "{{ awx_admin_user }}"
+        tower_password: "{{ awx_admin_password }}"
+        validate_certs: "{{ awx_ssl_verify }}"
+      with_items: "{{ awx_projects }}"
+      run_once: yes
+      when: item.local_path is defined
+
+    - name: create projects
+      tower_project:
+        name: "{{ item.name }}"
+        state: "{{ item.state }}"
+        description: "{{ item.description|default(omit) }}"
+        organization: "{{ item.organization|default(omit) }}"
+        scm_type: "{{ item.scm_type|default(omit) }}"
+        scm_credential: "{{ item.scm_credential|default(omit) }}"
+        scm_branch: "{{ item.scm_branch|default(omit) }}"
+        scm_update_on_launch: "{{ item.scm_update_on_launch|default(omit) }}"
+        scm_url: "{{ item.scm_url|default(omit) }}"
+        local_path: "{{ item.local_path|default(omit) }}"
+        tower_host: "{{ awx_host_url }}"
+        tower_username: "{{ awx_admin_user }}"
+        tower_password: "{{ awx_admin_password }}"
+        tower_verify_ssl: "{{ awx_ssl_verify }}"
+      with_items: "{{ awx_projects }}"
+      run_once: yes
+      when: item.local_path is not defined
+
+    - name: update scm projects
+      shell: tower-cli project update --name="{{ item.name }}" --wait
+      with_items: "{{ awx_projects }}"
+      run_once: yes
+      when: item.scm_type == "git" and awx_bootstrap
+
+    - name: deploy default attributes file
+      template:
+        src: default_attributes.yml.j2
+        dest: "{{ awx_default_attributes_file }}"
+        owner: root
+        group: root
+        mode: 0600
+
+    - name: create inventory
+      tower_inventory:
+        name: "{{ item.name }}"
+        description: "{{ item.description|default(omit) }}"
+        organization: "{{ item.organization }}"
+        kind: "{{ item.kind|default(omit) }}"
+        host_filter: "{{ item.host_filter|default(omit) }}"
+        variables: "{{ item.variables|default(omit) }}"
+        insights_credential: "{{ item.insights_credential|default(omit) }}"
+        state: "{{ item.state }}"
+        tower_host: "{{ awx_host_url }}"
+        tower_username: "{{ awx_admin_user }}"
+        tower_password: "{{ awx_admin_password }}"
+        tower_verify_ssl: "{{ awx_ssl_verify }}"
+      with_items: "{{ awx_inventory }}"
+      run_once: yes
+
+    - name: create inventory groups
+      shell: tower-cli group create --name="{{ item.1 }}" --inventory="{{ item.0.name }}"
+      with_subelements:
+        - "{{ awx_inventory }}"
+        - groups
+        - skip_missing: yes
+      register: result
+      changed_when: result.stdout | search("true")
+      run_once: yes
+
+    - name: create inventory hosts
+      tower_host:
+        name: "{{ item.1 }}"
+        description: "{{ item.0.description|default(omit) }}"
+        inventory: "{{ item.0.inventory }}"
+        enabled: "{{ item.0.enabled|default(omit) }}"
+        variables: "{{ item.0.variables|default(omit) }}"
+        state: "{{ item.0.state }}"
+        tower_host: "{{ awx_host_url }}"
+        tower_username: "{{ awx_admin_user }}"
+        tower_password: "{{ awx_admin_password }}"
+        tower_verify_ssl: "{{ awx_ssl_verify }}"
+      with_subelements:
+        - "{{ awx_inventory_hosts }}"
+        - group_items
+      run_once: yes
+
+    - name: assign hosts to groups
+      shell: tower-cli host associate --host="{{ item.1 }}" --group="{{ item.0.group }}"
+      register: result
+      changed_when: result.stdout | search("true")
+      with_subelements:
+        - "{{ awx_inventory_hosts }}"
+        - group_items
+      run_once: yes
+
+    - name: create inventory script
+      shell: tower-cli inventory_script create --name="{{ item.name }}" --organization="{{ item.organization }}" --script="{{ item.script }}"
+      with_items: "{{ awx_inventory_scripts }}"
+      register: result
+      run_once: yes
+      changed_when: result.stdout | search("true")
+
+    - name: create scm inventory sources
+      shell: tower-cli inventory_source create --name="{{ item.1.name }}" --description="{{ item.1.description }}" --inventory="{{ item.0.name }}" --source="{{ item.1.source }}" --source-project="{{ item.1.source_project }}" --source-path="{{ item.1.source_path }}" --overwrite-vars=true
+      with_subelements:
+        - "{{ awx_inventory }}"
+        - sources
+        - skip_missing: yes
+      register: result
+      changed_when: result.stdout | search("true")
+      run_once: yes
+      when: item.1.source == "scm"
+
+    - name: create custom inventory sources
+      shell: tower-cli inventory_source create --name="{{ item.1.name }}" --description="{{ item.1.description }}" --inventory="{{ item.0.name }}" --source="{{ item.1.source }}" --source-script="{{ item.1.source_script }}" --overwrite-vars=true
+      with_subelements:
+        - "{{ awx_inventory }}"
+        - sources
+        - skip_missing: yes
+      register: result
+      changed_when: result.stdout | search("true")
+      run_once: yes
+      when: item.1.source == "custom"
+
+    # - name: create job templates
+    #   tower_job_template:
+    #     name: "{{ item.name }}"
+    #     state: "{{ item.state }}"
+    #     description: "{{ item.description|default(omit) }}"
+    #     job_type: "{{ item.job_type }}"
+    #     inventory: "{{ item.inventory }}"
+    #     project: "{{ item.project }}"
+    #     playbook: "{{ item.playbook }}"
+    #     tower_host: "{{ awx_host_url }}"
+    #     tower_username: "{{ awx_admin_user }}"
+    #     tower_password: "{{ awx_admin_password }}"
+    #     tower_verify_ssl: "{{ awx_ssl_verify }}"
+    #   with_items: "{{ awx_job_templates }}"
+    #   run_once: yes
+
+    - name: create job templates
+      shell: tower-cli job_template create --name="{{ item.name }}"{% if item.description is defined %} --description="{{ item.description }}"{% endif %}{% if item.inventory is defined %} --inventory="{{ item.inventory }}"{% endif %} --project="{{ item.project }}" --playbook="{{ item.playbook }}"{% if item.inventory is defined %} --credential="{{ item.machine_credential }}"{% endif %}{% if item.vault_credential is defined %} --vault-credential="{{ item.vault_credential }}"{% endif %}{% if item.use_fact_cache is defined %} --use-fact-cache="{{ item.use_fact_cache }}"{% endif %}
+      with_items: "{{ awx_job_templates }}"
+      register: result
+      run_once: yes
+
+    # - name: assign credentials to job templates
+    #   shell: tower-cli job_template associate_credential --job-template="{{ item.0.name }}" --credential="{{ item.1 }}"
+    #   with_subelements:
+    #     - "{{ awx_job_templates }}"
+    #     - credentials
+    #   register: result
+    #   run_once: yes
