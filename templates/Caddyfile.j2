@@ -1,0 +1,73 @@
+{% if awx_ssl_enabled is sameas true %}
+(caddy_tls_custom) {
+    tls {{ awx_ssl_cert_file }} {{ awx_ssl_key_file }}
+}
+
+{% endif %}
+{% if awx_ssl_enabled is sameas true %}
+{{ awx_host }}:8053 {
+{% else %}
+{{ awx_host }}:8052 {
+{% endif %}
+    proxy / awxweb:8050 {
+        transparent
+        max_fails 10
+        fail_timeout 30s
+        keepalive 1
+    }
+
+    try_files {path} /static/favicon.ico
+
+    rewrite {
+        r (.*[^/])$
+        to {1}/
+    }
+{% if awx_ssl_enabled is sameas true %}
+    import caddy_tls_custom
+{% else %}
+    tls off
+{% endif %}
+    timeouts none
+    log stdout
+    errors stdout
+}
+
+{% if awx_ssl_enabled is sameas true %}
+{{ awx_host }}:8053/websocket/ {
+{% else %}
+{{ awx_host }}:8052/websocket/ {
+{% endif %}
+    proxy / awxweb:8051 {
+        transparent
+        websocket
+        max_fails 10
+        fail_timeout 30s
+        keepalive 1
+    }
+
+{% if awx_ssl_enabled is sameas true %}
+    import caddy_tls_custom
+{% else %}
+    tls off
+{% endif %}
+    timeouts none
+    log stdout
+    errors stdout
+}
+
+{% if awx_ssl_enabled is sameas true %}
+{{ awx_host }}:8053/static/ {
+{% else %}
+{{ awx_host }}:8052/static/ {
+{% endif %}
+    root /var/lib/awx/public/static/
+
+{% if awx_ssl_enabled is sameas true %}
+    import caddy_tls_custom
+{% else %}
+    tls off
+{% endif %}
+    timeouts none
+    log stdout
+    errors stdout
+}

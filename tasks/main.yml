@@ -1,8 +1,5 @@
 ---
 # tasks file for awx
-# - name: Setup prereqs
-#   include_tasks: prereqs.yml
-
 - name: Install apps
   include_tasks: setup.yml
 

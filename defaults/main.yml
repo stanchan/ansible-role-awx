@@ -1,35 +1,88 @@
 ---
 # defaults file for awx
-pip_packages:
-  - name: jmespath
-    version: latest
-  - name: cffi
-    version: latest
-  - name: setuptools
-    version: latest
-  - name: PyYAML
-    version: latest
-  - name: ansible
-    version: latest
-  - name: ansible-vault
-    version: latest
-  - name: ansible-tower-cli
-    version: "{{ awx_cli_version }}"
 
-awx_version: 4.0.0
-awx_cli_version: 3.3.4
-awx_dockerhub_base: uberdeploy
-awx_web_hostname: awxweb
+# Move the following to group_vars/host_vars in inventory
+awx_version: 9.3.0
+awx_cli_version: "{{ awx_version }}"
+awx_install_path: /opt
+awx_python_version: 3.8.2
+awx_python_bin: "{{ awx_default_conda_path }}/bin/python"
+awx_default_conda_path: "{{ miniconda_env | selectattr('default', 'equalto', true) | map(attribute='path') | list | first }}/conda/miniconda3/envs/{{ miniconda_env | selectattr('default', 'equalto', true) | map(attribute='env') | map(attribute='name') | list | first }}"
+
+awx_cli_bin: awx
+awx_dockerhub_base: stanchan
+awx_web_host: awxweb
 awx_web_docker_image: "{{ awx_dockerhub_base }}/awx_web:{{ awx_version }}"
-awx_task_hostname: awx
+awx_task_host: awx
 awx_task_docker_image: "{{ awx_dockerhub_base }}/awx_task:{{ awx_version }}"
 
+awx_git_url: https://github.com/ansible/awx.git
+awx_git_revison: "{{ awx_version }}"
+
 awx_host: awxhost.shift-labs.com
-awx_host_port: 8052
+awx_host_port: 80
+awx_host_port_ssl: 443
 awx_host_url: "http://{{ awx_host }}:{{ awx_host_port }}"
+
+awx_ssl_enabled: no
+awx_ssl_cert_file: /etc/caddy/server.crt
+awx_ssl_key_file: /etc/caddy/server.key
+
+awx_docker_compose_dir: /opt/docker-awx
+awx_admin_user: admin
+awx_admin_password: password
+awx_secret_key: awxsecret
+awx_ssl_verify: yes
+awx_search_domains: shift-labs.com
+
+awx_project_data_dir: /var/lib/awx/projects
+#awx_ca_trust_dir: /etc/pki/ca-trust/source/anchors
+awx_config: /root/.tower_cli.cfg
+awx_inventory_dir: "{{ awx_project_data_dir }}/inventory"
+awx_default_attributes_file: "{{ awx_inventory_dir }}/default_attributes.yml"
 
 awx_network: default
 awx_network_type: bridge
+
+awx_enable_nginx: yes
+awx_create_preload_data: 'True'
+awx_custom_assets: 'False'
+
+awx_inventory_vars:
+  all:vars:
+    host_port: "{{ awx_host_port }}"
+    host_port_ssl: "{{ awx_host_port_ssl }}"
+    postgresql_image: "{{ postgresql_image }}"
+    pg_username: "{{ postgres_user }}"
+    pg_password: "{{ postgres_password }}"
+    pg_database: "{{ postgres_db }}"
+    pg_port: "{{ postgres_port }}"
+    postgres_data_dir: "{{ postgres_data_dir }}"
+    rabbitmq_image: "{{ rabbitmq_image }}"
+    rabbitmq_vhost: "{{ rabbitmq_vhost }}"
+    rabbitmq_port: "{{ rabbitmq_port }}"
+    rabbitmq_user: "{{ rabbitmq_user }}"
+    rabbitmq_password: "{{ rabbitmq_password }}"
+    rabbitmq_erlang_cookie: "{{ rabbitmq_erlang_cookie }}"
+    memcached_image: "{{ memcached_image }}"
+    memcached_hostname: "{{ memcached_host }}"
+    memcached_port: "{{ memcached_port }}"
+    secret_key: "{{ awx_secret_key }}"
+    admin_user: "{{ awx_admin_user }}"
+    admin_password: "{{ awx_admin_password }}"
+    project_data_dir: "{{ awx_project_data_dir }}"
+    create_preload_data: "{{ awx_create_preload_data }}"
+    docker_compose_dir: "{{ awx_docker_compose_dir }}"
+    awx_web_hostname: "{{ awx_web_host }}"
+    awx_task_hostname: "{{ awx_task_host }}"
+    awx_search_domains: "{{ awx_search_domains | default(omit) }}"
+    awx_extra_hosts: "[ {{ awx_extra_hosts | default(omit) | quote }} ]"
+    awx_network: "{{ awx_network }}"
+    awx_network_type: "{{ awx_network_type }}"
+    awx_ssl_enabled: "{{ awx_ssl_enabled }}"
+    awx_ssl_cert_file: "{{ awx_ssl_cert_file }}"
+    awx_ssl_key_file: "{{ awx_ssl_key_file }}"
+    awx_official: "{{ awx_custom_assets }}"
 
 rabbitmq_version: 3.7.4
 rabbitmq_image: "ansible/awx_rabbitmq:{{rabbitmq_version}}"
@@ -44,33 +97,14 @@ memcached_image: "memcached:alpine"
 memcached_host: memcached
 memcached_port: 11211
 
-postgresql_version: 9.6
+postgresql_version: 10
 postgresql_image: "postgres:{{postgresql_version}}"
+#postgres_host: "{{ postgres_hostname | default('postgres') }}"
 postgres_user: awx
 postgres_password: password
 postgres_db: awx
-postgres_host: postgres
 postgres_port: 5432
-postgres_data_dir: /srv/awx/postgres
-
-host_port: 80
-#ssl_certificate:
-
-awx_docker_compose_dir: /srv/docker-awx
-awx_admin_user: admin
-awx_admin_password: password
-awx_secret_key: awxsecret
-awx_ssl_verify: yes
-awx_search_domains:
-  - shift-labs.com
-
-awx_project_data_dir: /var/lib/awx/projects
-#awx_ca_trust_dir: /etc/pki/ca-trust/source/anchors
-awx_config: /root/.tower_cli.cfg
-awx_inventory_dir: "{{ awx_project_data_dir }}/inventory"
-awx_default_attributes_file: "{{ awx_inventory_dir }}/default_attributes.yml"
-
-create_preload_data: yes
+postgres_data_dir: "{{ awx_docker_compose_dir }}/postgres"
 
 awx_orgs:
   Demo:
@@ -176,3 +210,34 @@ awx_job_templates:
     playbook: demo.yml
     use_fact_cache: yes
     state: present
+
+# Move the following to group_vars/host_vars in inventory
+miniconda_manage_dependencies: yes
+miniconda_env:
+  - name: conda
+    path: "{{ awx_install_path }}"
+    profile: /root/.bashrc
+    create_opts: "-q"
+    update: yes
+    default: yes
+    env:
+      name: awx
+      dependencies:
+        - git
+        - pip
+        - postgresql
+        - "python={{ awx_python_version }}"
+        - pip:
+          - ansible
+          - ansible-vault
+          - cffi
+          - docker-compose
+          - "git+https://github.com/ansible/awx.git@{{ awx_cli_version }}#egg=awxkit&subdirectory=awxkit"
+          - jmespath
+          - PyYAML
+      channels:
+        - defaults
+        - conda-forge
+
+caddy_path: /bin:/sbin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:{{ awx_default_conda_path }}/bin
+

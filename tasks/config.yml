@@ -80,7 +80,7 @@
       run_once: yes
 
     - name: assign users to teams
-      shell: tower-cli team associate --team "{{ item.1 }}" --user "{{ item.0.username }}"
+      shell: awx team associate --team "{{ item.1 }}" --user "{{ item.0.username }}"
       with_subelements:
         - "{{ awx_users }}"
         - teams
@@ -90,7 +90,7 @@
       run_once: yes
 
     - name: create "Machine" credentials
-      shell: "tower-cli credential create --name=\"{{ item.name }}\" --team=\"{{ item.team }}\" --credential-type=\"{{ item.credential_type }}\" --inputs=\"username: {{ item.username }}\nssh_key_data: |\n{{ item.ssh_key_data | regex_replace('^', '  ') | regex_replace('\\n', '\\n  ') }}\""
+      shell: "awx credential create --name=\"{{ item.name }}\" --team=\"{{ item.team }}\" --credential-type=\"{{ item.credential_type }}\" --inputs=\"username: {{ item.username }}\nssh_key_data: |\n{{ item.ssh_key_data | regex_replace('^', '  ') | regex_replace('\\n', '\\n  ') }}\""
       with_items:
         - "{{ awx_credentials }}"
       register: result
@@ -100,7 +100,7 @@
       when: item.credential_type == "Machine"
 
     - name: create "Source Control" credentials
-      shell: "tower-cli credential create --name=\"{{ item.name }}\" --team=\"{{ item.team }}\" --credential-type=\"{{ item.credential_type }}\"{% if item.ssh_key_data is defined %} --inputs=\"ssh_key_data: |\n{{ item.ssh_key_data | regex_replace('^', '  ') | regex_replace('\\n', '\\n  ') }}\"{% endif %}"
+      shell: "awx credential create --name=\"{{ item.name }}\" --team=\"{{ item.team }}\" --credential-type=\"{{ item.credential_type }}\"{% if item.ssh_key_data is defined %} --inputs=\"ssh_key_data: |\n{{ item.ssh_key_data | regex_replace('^', '  ') | regex_replace('\\n', '\\n  ') }}\"{% endif %}"
       with_items:
         - "{{ awx_credentials }}"
       register: result
@@ -110,7 +110,7 @@
       when: item.credential_type == "Source Control"
 
     - name: create "Vault" credentials
-      shell: "tower-cli credential create --name=\"{{ item.name }}\" --team=\"{{ item.team }}\" --credential-type=\"{{ item.credential_type }}\" --inputs=\"vault_password: {{ item.vault_password }}\""
+      shell: "awx credential create --name=\"{{ item.name }}\" --team=\"{{ item.team }}\" --credential-type=\"{{ item.credential_type }}\" --inputs=\"vault_password: {{ item.vault_password }}\""
       with_items:
         - "{{ awx_credentials }}"
       register: result
@@ -160,7 +160,7 @@
       when: item.local_path is not defined
 
     - name: update scm projects
-      shell: tower-cli project update --name="{{ item.name }}" --wait
+      shell: awx project update --name="{{ item.name }}" --wait
       with_items: "{{ awx_projects }}"
       run_once: yes
       when: item.scm_type == "git" and awx_bootstrap
@@ -191,7 +191,7 @@
       run_once: yes
 
     - name: create inventory groups
-      shell: tower-cli group create --name="{{ item.1 }}" --inventory="{{ item.0.name }}"
+      shell: awx group create --name="{{ item.1 }}" --inventory="{{ item.0.name }}"
       with_subelements:
         - "{{ awx_inventory }}"
         - groups
@@ -218,7 +218,7 @@
       run_once: yes
 
     - name: assign hosts to groups
-      shell: tower-cli host associate --host="{{ item.1 }}" --group="{{ item.0.group }}"
+      shell: awx host associate --host="{{ item.1 }}" --group="{{ item.0.group }}"
       register: result
       changed_when: result.stdout | search("true")
       with_subelements:
@@ -227,14 +227,14 @@
       run_once: yes
 
     - name: create inventory script
-      shell: tower-cli inventory_script create --name="{{ item.name }}" --organization="{{ item.organization }}" --script="{{ item.script }}"
+      shell: awx inventory_script create --name="{{ item.name }}" --organization="{{ item.organization }}" --script="{{ item.script }}"
       with_items: "{{ awx_inventory_scripts }}"
       register: result
       run_once: yes
       changed_when: result.stdout | search("true")
 
     - name: create scm inventory sources
-      shell: tower-cli inventory_source create --name="{{ item.1.name }}" --description="{{ item.1.description }}" --inventory="{{ item.0.name }}" --source="{{ item.1.source }}" --source-project="{{ item.1.source_project }}" --source-path="{{ item.1.source_path }}" --overwrite-vars=true
+      shell: awx inventory_source create --name="{{ item.1.name }}" --description="{{ item.1.description }}" --inventory="{{ item.0.name }}" --source="{{ item.1.source }}" --source-project="{{ item.1.source_project }}" --source-path="{{ item.1.source_path }}" --overwrite-vars=true
       with_subelements:
         - "{{ awx_inventory }}"
         - sources
@@ -245,7 +245,7 @@
       when: item.1.source == "scm"
 
     - name: create custom inventory sources
-      shell: tower-cli inventory_source create --name="{{ item.1.name }}" --description="{{ item.1.description }}" --inventory="{{ item.0.name }}" --source="{{ item.1.source }}" --source-script="{{ item.1.source_script }}" --overwrite-vars=true
+      shell: awx inventory_source create --name="{{ item.1.name }}" --description="{{ item.1.description }}" --inventory="{{ item.0.name }}" --source="{{ item.1.source }}" --source-script="{{ item.1.source_script }}" --overwrite-vars=true
       with_subelements:
         - "{{ awx_inventory }}"
         - sources
@@ -272,13 +272,13 @@
     #   run_once: yes
 
     - name: create job templates
-      shell: tower-cli job_template create --name="{{ item.name }}"{% if item.description is defined %} --description="{{ item.description }}"{% endif %}{% if item.inventory is defined %} --inventory="{{ item.inventory }}"{% endif %} --project="{{ item.project }}" --playbook="{{ item.playbook }}"{% if item.inventory is defined %} --credential="{{ item.machine_credential }}"{% endif %}{% if item.vault_credential is defined %} --vault-credential="{{ item.vault_credential }}"{% endif %}{% if item.use_fact_cache is defined %} --use-fact-cache="{{ item.use_fact_cache }}"{% endif %}
+      shell: awx job_template create --name="{{ item.name }}"{% if item.description is defined %} --description="{{ item.description }}"{% endif %}{% if item.inventory is defined %} --inventory="{{ item.inventory }}"{% endif %} --project="{{ item.project }}" --playbook="{{ item.playbook }}"{% if item.inventory is defined %} --credential="{{ item.machine_credential }}"{% endif %}{% if item.vault_credential is defined %} --vault-credential="{{ item.vault_credential }}"{% endif %}{% if item.use_fact_cache is defined %} --use-fact-cache="{{ item.use_fact_cache }}"{% endif %}
       with_items: "{{ awx_job_templates }}"
       register: result
       run_once: yes
 
     # - name: assign credentials to job templates
-    #   shell: tower-cli job_template associate_credential --job-template="{{ item.0.name }}" --credential="{{ item.1 }}"
+    #   shell: awx job_template associate_credential --job-template="{{ item.0.name }}" --credential="{{ item.1 }}"
     #   with_subelements:
     #     - "{{ awx_job_templates }}"
     #     - credentials

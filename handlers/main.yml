@@ -1,6 +1,6 @@
 ---
 # handlers file for awx
-- name: restart docker services
-  docker_service:
-    project_src: "{{ awx_docker_compose_dir }}"
-    restarted: yes
+# - name: restart docker services
+#   docker_service:
+#     project_src: "{{ awx_docker_compose_dir }}"
+#     restarted: yes

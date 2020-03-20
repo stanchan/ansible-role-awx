@@ -16,25 +16,25 @@
         mode: 0600
 
     - name: remove default organization
-      shell: tower-cli organization delete --name "Default" --insecure
+      shell: awx organization delete --name "Default" --insecure
       register: result
       changed_when: result.stdout | search("true")
       run_once: yes
 
     - name: remove demo project
-      shell: tower-cli project delete --name "Demo Project" --insecure
+      shell: awx project delete --name "Demo Project" --insecure
       register: result
       changed_when: result.stdout | search("true")
       run_once: yes
 
     - name: remove demo credential
-      shell: tower-cli credential delete --name "Demo Credential" --insecure
+      shell: awx credential delete --name "Demo Credential" --insecure
       register: result
       changed_when: result.stdout | search("true")
       run_once: yes
 
     - name: remove demo job template
-      shell: tower-cli job_template delete --name "Demo Job Template" --insecure
+      shell: awx job_template delete --name "Demo Job Template" --insecure
       register: result
       changed_when: result.stdout | search("true")
       run_once: yes
