@@ -48,6 +48,8 @@ awx_enable_nginx: yes
 awx_create_preload_data: 'True'
 awx_custom_assets: 'False'
 
+awx_bootstrap: yes
+
 awx_inventory_vars:
   all:vars:
     host_port: "{{ awx_host_port }}"
@@ -153,8 +155,8 @@ awx_inventory_scripts:
       tsh -i ~/.ssh/id_rsa --proxy={{ teleport_proxy_host }}:{{ teleport_proxy_web_listen_address.split(':')[1] }} --user={{ teleport_awx_user }} ls --format=json \"\$@\"
 
 awx_inventory:
-  - name: Demo_scm_awx-demo
-    description: Demo_scm_awx-demo inventory
+  - name: Demo_scm_awx_inventory
+    description: Demo_scm_awx inventory
     organization: Demo
     sources:
       - name: production
@@ -163,8 +165,8 @@ awx_inventory:
         source_project: stanchan_awx-demo
         source_path: inventory/production/hosts
     state: present
-  - name: Demo_teleport_awx-demo
-    description: Demo_teleport_awx-demo inventory
+  - name: Demo_teleport_awx_inventory
+    description: Demo_teleport_awx inventory
     organization: Demo
     sources:
       - name: production
@@ -172,8 +174,8 @@ awx_inventory:
         source: custom
         source_script: teleport_production
     state: present
-  - name: Demo_production_awx-demo
-    description: Demo_production_awx-demo inventory
+  - name: Demo_production_awx_inventory
+    description: Demo_production_awx inventory
     organization: Demo
     groups:
       - awx
@@ -181,16 +183,9 @@ awx_inventory:
     state: present
 
 awx_inventory_hosts:
-  - name: Demo_production_awx-demo awx
-    inventory: Demo_production_awx-demo
-    group: awx
-    group_items: "{{ groups['awx']}}"
-    enabled: yes
-    state: present
-  - name: Demo_production_awx-demo docker
-    inventory: Demo_production_awx-demo
-    group: docker
-    group_items: "{{ groups['docker']}}"
+  - name: Demo_production_awx
+    inventory: Demo_production_awx_inventory
+    hosts: "{{ groups['awx']}}"
     enabled: yes
     state: present
 

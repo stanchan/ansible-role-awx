@@ -1,286 +1,297 @@
 ---
-- name: Configure awx
-  hosts: awx
-  vars:
-    awx_bootstrap: yes
-  tasks:
-    - name: change default awx admin password
-      tower_user:
-        username: "{{ awx_admin_user }}"
-        password: "{{ awx_admin_password }}"
-        email: "noreply@chanfx.com"
-        first_name: Admin
-        last_name: Account
-        superuser: True
-        state: present
-        tower_host: "{{ awx_host_url }}"
-        tower_verify_ssl: "{{ awx_ssl_verify }}"
-        tower_username: admin
-        tower_password: password
-      run_once: yes
-      ignore_errors: yes
+- name: change default awx admin password
+  tower_user:
+    username: "{{ awx_admin_user }}"
+    password: "{{ awx_admin_password }}"
+    email: "noreply@chanfx.com"
+    first_name: Admin
+    last_name: Account
+    superuser: True
+    state: present
+    tower_host: "{{ awx_host_url }}"
+    tower_username: admin
+    tower_password: password
+    tower_verify_ssl: "{{ awx_ssl_verify }}"
+  run_once: yes
+  ignore_errors: yes
 
-    - name: deploy tower cli config file
-      template:
-        src: tower_cli.cfg.j2
-        dest: "{{ awx_config }}"
-        owner: root
-        group: root
-        mode: 0600
+- name: deploy tower cli config file
+  template:
+    src: tower_cli.cfg.j2
+    dest: "{{ awx_config }}"
+    owner: root
+    group: root
+    mode: 0600
 
-    - name: create organizations
-      tower_organization:
-        name: "{{ item.value.name }}"
-        description: "{{ item.value.description }}"
-        state: "{{ item.value.state }}"
-        tower_host: "{{ awx_host_url }}"
-        tower_verify_ssl: "{{ awx_ssl_verify }}"
-        tower_username: "{{ awx_admin_user }}"
-        tower_password: "{{ awx_admin_password }}"
-      with_dict: "{{ awx_orgs }}"
-      run_once: yes
+- name: create organizations
+  tower_organization:
+    name: "{{ item.value.name }}"
+    description: "{{ item.value.description }}"
+    state: "{{ item.value.state }}"
+    tower_host: "{{ awx_host_url }}"
+    tower_username: "{{ awx_admin_user }}"
+    tower_password: "{{ awx_admin_password }}"
+    tower_verify_ssl: "{{ awx_ssl_verify }}"
+  loop: "{{ awx_orgs|dict2items }}"
+  run_once: yes
 
-    - name: create teams
-      tower_team:
-        name: "{{ item.value.name }}"
-        description: "{{ item.value.description }}"
-        organization: "{{ item.value.organization }}"
-        state: "{{ item.value.state }}"
-        tower_host: "{{ awx_host_url }}"
-        tower_verify_ssl: "{{ awx_ssl_verify }}"
-        tower_username: "{{ awx_admin_user }}"
-        tower_password: "{{ awx_admin_password }}"
-      with_dict: "{{ awx_teams }}"
-      run_once: yes
+- name: create teams
+  tower_team:
+    name: "{{ item.value.name }}"
+    description: "{{ item.value.description }}"
+    organization: "{{ item.value.organization }}"
+    state: "{{ item.value.state }}"
+    tower_host: "{{ awx_host_url }}"
+    tower_username: "{{ awx_admin_user }}"
+    tower_password: "{{ awx_admin_password }}"
+    tower_verify_ssl: "{{ awx_ssl_verify }}"
+  loop: "{{ awx_teams|dict2items }}"
+  run_once: yes
 
-    - name: create users
-      tower_user:
-        email: "{{ item.email }}"
-        username: "{{ item.username|default(omit) }}"
-        password: "{{ item.password|default(omit) }}"
-        first_name: "{{ item.first_name|default(omit) }}"
-        last_name: "{{ item.last_name|default(omit) }}"
-        superuser: "{{ item.superuser|default(omit) }}"
-        state: "{{ item.state }}"
-        tower_host: "{{ awx_host_url }}"
-        tower_verify_ssl: "{{ awx_ssl_verify }}"
-        tower_username: "{{ awx_admin_user }}"
-        tower_password: "{{ awx_admin_password }}"
-      with_items: "{{ awx_users }}"
-      no_log: yes
-      run_once: yes
+- name: create users
+  tower_user:
+    email: "{{ item.email }}"
+    username: "{{ item.username }}"
+    state: "{{ item.state }}"
+    auditor: "{{ item.auditor|d(omit) }}"
+    password: "{{ item.password|d(omit) }}"
+    first_name: "{{ item.first_name|d(omit) }}"
+    last_name: "{{ item.last_name|d(omit) }}"
+    superuser: "{{ item.superuser|d(omit) }}"
+    tower_host: "{{ awx_host_url }}"
+    tower_username: "{{ awx_admin_user }}"
+    tower_password: "{{ awx_admin_password }}"
+    tower_verify_ssl: "{{ awx_ssl_verify }}"
+  loop: "{{ awx_users }}"
+  no_log: no
+  run_once: yes
 
-    - name: assign users to teams
-      shell: awx-cli user list --username  {{ item.username }}
-      with_items: "{{ awx_users }}"
-      register: list_user_result
-      failed_when: list_user_result.stdout | match("No records found.")
-      changed_when: yes
-      no_log: yes
-      run_once: yes
+# - name: assign users to teams
+#   shell: awx-cli user list --username {{ item.username }}
+#   loop: "{{ awx_users }}"
+#   register: list_user_result
+#   failed_when: list_user_result.stdout is match("No records found.")
+#   changed_when: yes
+#   no_log: yes
+#   run_once: yes
 
-    - name: assign users to teams
-      shell: awx team associate --team "{{ item.1 }}" --user "{{ item.0.username }}"
-      with_subelements:
-        - "{{ awx_users }}"
-        - teams
-      register: result
-      changed_when: result.stdout | search("true")
-      no_log: yes
-      run_once: yes
+- name: assign users to teams
+  shell: awx-cli team associate --team "{{ item.1 }}" --user "{{ item.0.username }}"
+  loop: "{{ awx_users|subelements('teams') }}"
+  register: result
+  changed_when: result.stdout is search("true")
+  no_log: no
+  run_once: yes
 
-    - name: create "Machine" credentials
-      shell: "awx credential create --name=\"{{ item.name }}\" --team=\"{{ item.team }}\" --credential-type=\"{{ item.credential_type }}\" --inputs=\"username: {{ item.username }}\nssh_key_data: |\n{{ item.ssh_key_data | regex_replace('^', '  ') | regex_replace('\\n', '\\n  ') }}\""
-      with_items:
-        - "{{ awx_credentials }}"
-      register: result
-      changed_when: result.stdout | search("true")
-      run_once: yes
-      no_log: yes
-      when: item.credential_type == "Machine"
+- name: create credentials
+  tower_credential:
+    name: "{{ item.name }}"
+    kind: "{{ item.kind }}"
+    organization: "{{ item.organization }}"
+    state: "{{ item.state }}"
+    authorize: "{{ item.authorize|d(omit) }}"
+    authorize_password: "{{ item.authorize_password|d(omit) }}"
+    become_method: "{{ item.become_method|d(omit) }}"
+    become_password: "{{ item.become_password|d(omit) }}"
+    become_username: "{{ item.become_username|d(omit) }}"
+    client: "{{ item.client|d(omit) }}"
+    description: "{{ item.description|d(omit) }}"
+    domain: "{{ item.domain|d(omit) }}"
+    host: "{{ item.host|d(omit) }}"
+    password: "{{ item.password|d(omit) }}"
+    secret: "{{ item.secret|d(omit) }}"
+    security_token: "{{ item.security_token|d(omit) }}"
+    ssh_key_data: "{{ item.ssh_key_data|d(omit) }}"
+    ssh_key_unlock: "{{ item.ssh_key_unlock|d(omit) }}"
+    subscription: "{{ item.subscription|d(omit) }}"
+    team: "{{ item.team|d(omit) }}"
+    tenant: "{{ item.tenant|d(omit) }}"
+    user: "{{ item.user|d(omit) }}"
+    username: "{{ item.username|d(omit) }}"
+    vault_id: "{{ item.vault_id|d(omit) }}"
+    vault_password: "{{ item.vault_password|d(omit) }}"
+    tower_host: "{{ awx_host_url }}"
+    tower_username: "{{ awx_admin_user }}"
+    tower_password: "{{ awx_admin_password }}"
+    tower_verify_ssl: "{{ awx_ssl_verify }}"
+  loop: "{{ awx_credentials }}"
+  no_log: no
+  run_once: yes
 
-    - name: create "Source Control" credentials
-      shell: "awx credential create --name=\"{{ item.name }}\" --team=\"{{ item.team }}\" --credential-type=\"{{ item.credential_type }}\"{% if item.ssh_key_data is defined %} --inputs=\"ssh_key_data: |\n{{ item.ssh_key_data | regex_replace('^', '  ') | regex_replace('\\n', '\\n  ') }}\"{% endif %}"
-      with_items:
-        - "{{ awx_credentials }}"
-      register: result
-      changed_when: result.stdout | search("true")
-      run_once: yes
-      no_log: yes
-      when: item.credential_type == "Source Control"
+- name: create projects
+  tower_project:
+    name: "{{ item.name }}"
+    state: "{{ item.state }}"
+    custom_virtualenv: "{{ item.custom_virtualenv|d(omit) }}"
+    description: "{{ item.description|d(omit) }}"
+    job_timeout: "{{ item.job_timeout|d(omit) }}"
+    local_path: "{{ item.local_path|d(omit) }}"
+    organization: "{{ item.organization|d(omit) }}"
+    scm_branch: "{{ item.scm_branch|d(omit) }}"
+    scm_clean: "{{ item.scm_clean|d(omit) }}"
+    scm_credential: "{{ item.scm_credential|d(omit) }}"
+    scm_delete_on_update: "{{ item.scm_delete_on_update|d(omit) }}"
+    scm_type: "{{ item.scm_type|d(omit) }}"
+    scm_update_cache_timeout: "{{ item.scm_update_cache_timeout|d(omit) }}"
+    scm_update_on_launch: "{{ item.scm_update_on_launch|d(omit) }}"
+    scm_url: "{{ item.scm_url|d(omit) }}"
+    tower_host: "{{ awx_host_url }}"
+    tower_username: "{{ awx_admin_user }}"
+    tower_password: "{{ awx_admin_password }}"
+    tower_verify_ssl: "{{ awx_ssl_verify }}"
+  loop: "{{ awx_projects }}"
+  run_once: yes
+  when: item.local_path is not defined
 
-    - name: create "Vault" credentials
-      shell: "awx credential create --name=\"{{ item.name }}\" --team=\"{{ item.team }}\" --credential-type=\"{{ item.credential_type }}\" --inputs=\"vault_password: {{ item.vault_password }}\""
-      with_items:
-        - "{{ awx_credentials }}"
-      register: result
-      changed_when: result.stdout | search("true")
-      run_once: yes
-      no_log: yes
-      when: item.credential_type == "Vault"
+- name: update scm projects
+  shell: awx-cli project update --name="{{ item.name }}" --wait
+  loop: "{{ awx_projects }}"
+  run_once: yes
+  when: item.scm_type == "git" and awx_bootstrap
 
-    - name: create projects
-      awx_project:
-        name: "{{ item.name }}"
-        state: "{{ item.state }}"
-        description: "{{ item.description|default(omit) }}"
-        organization: "{{ item.organization|default(omit) }}"
-        scm_type: "{{ item.scm_type|default(omit) }}"
-        scm_credential: "{{ item.scm_credential|default(omit) }}"
-        scm_branch: "{{ item.scm_branch|default(omit) }}"
-        scm_update_on_launch: "{{ item.scm_update_on_launch|default(omit) }}"
-        scm_url: "{{ item.scm_url|default(omit) }}"
-        local_path: "{{ item.local_path|default(omit) }}"
-        tower_host: "{{ awx_host_url }}"
-        tower_username: "{{ awx_admin_user }}"
-        tower_password: "{{ awx_admin_password }}"
-        validate_certs: "{{ awx_ssl_verify }}"
-      with_items: "{{ awx_projects }}"
-      run_once: yes
-      when: item.local_path is defined
+- name: deploy default attributes file
+  template:
+    src: default_attributes.yml.j2
+    dest: "{{ awx_default_attributes_file }}"
+    owner: root
+    group: root
+    mode: 0600
 
-    - name: create projects
-      tower_project:
-        name: "{{ item.name }}"
-        state: "{{ item.state }}"
-        description: "{{ item.description|default(omit) }}"
-        organization: "{{ item.organization|default(omit) }}"
-        scm_type: "{{ item.scm_type|default(omit) }}"
-        scm_credential: "{{ item.scm_credential|default(omit) }}"
-        scm_branch: "{{ item.scm_branch|default(omit) }}"
-        scm_update_on_launch: "{{ item.scm_update_on_launch|default(omit) }}"
-        scm_url: "{{ item.scm_url|default(omit) }}"
-        local_path: "{{ item.local_path|default(omit) }}"
-        tower_host: "{{ awx_host_url }}"
-        tower_username: "{{ awx_admin_user }}"
-        tower_password: "{{ awx_admin_password }}"
-        tower_verify_ssl: "{{ awx_ssl_verify }}"
-      with_items: "{{ awx_projects }}"
-      run_once: yes
-      when: item.local_path is not defined
+- name: create inventory
+  tower_inventory:
+    name: "{{ item.name }}"
+    description: "{{ item.description|d(omit) }}"
+    organization: "{{ item.organization }}"
+    kind: "{{ item.kind|d(omit) }}"
+    host_filter: "{{ item.host_filter|d(omit) }}"
+    variables: "{{ item.variables|d(omit) }}"
+    insights_credential: "{{ item.insights_credential|d(omit) }}"
+    state: "{{ item.state }}"
+    tower_host: "{{ awx_host_url }}"
+    tower_username: "{{ awx_admin_user }}"
+    tower_password: "{{ awx_admin_password }}"
+    tower_verify_ssl: "{{ awx_ssl_verify }}"
+  loop: "{{ awx_inventory }}"
+  run_once: yes
 
-    - name: update scm projects
-      shell: awx project update --name="{{ item.name }}" --wait
-      with_items: "{{ awx_projects }}"
-      run_once: yes
-      when: item.scm_type == "git" and awx_bootstrap
+- name: create inventory groups
+  tower_group:
+    name: "{{ item.name }}"
+    inventory: "{{ item.inventory }}"
+    state: "{{ item.state }}"
+    credential: "{{ item.insights_credential|d(omit) }}"
+    description: "{{ item.description|d(omit) }}"
+    group_by: "{{ item.group_by|d(omit) }}"
+    instance_filters: "{{ item.instance_filters|d(omit) }}"
+    overwrite: "{{ item.overwrite|d(omit) }}"
+    overwrite_vars: "{{ item.overwrite_vars|d(omit) }}"
+    source: "{{ item.source|d(omit) }}"
+    source_regions: "{{ item.source_regions|d(omit) }}"
+    source_script: "{{ item.source_script|d(omit) }}"
+    source_vars: "{{ item.source_vars|d(omit) }}"
+    tower_host: "{{ awx_host_url }}"
+    tower_username: "{{ awx_admin_user }}"
+    tower_password: "{{ awx_admin_password }}"
+    tower_verify_ssl: "{{ awx_ssl_verify }}"
+  loop: "{{ awx_groups }}"
+  run_once: yes
 
-    - name: deploy default attributes file
-      template:
-        src: default_attributes.yml.j2
-        dest: "{{ awx_default_attributes_file }}"
-        owner: root
-        group: root
-        mode: 0600
+- name: create inventory hosts
+  tower_host:
+    inventory: "{{ item.0.inventory }}"
+    name: "{{ item.1 }}"
+    state: "{{ item.0.state }}"
+    description: "{{ item.0.description|d(omit) }}"
+    enabled: "{{ item.0.enabled|d(omit) }}"
+    variables: "{{ item.0.variables|d(omit) }}"
+    tower_host: "{{ awx_host_url }}"
+    tower_username: "{{ awx_admin_user }}"
+    tower_password: "{{ awx_admin_password }}"
+    tower_verify_ssl: "{{ awx_ssl_verify }}"
+  loop: "{{ awx_inventory_hosts|subelements('hosts') }}"
+  run_once: yes
 
-    - name: create inventory
-      tower_inventory:
-        name: "{{ item.name }}"
-        description: "{{ item.description|default(omit) }}"
-        organization: "{{ item.organization }}"
-        kind: "{{ item.kind|default(omit) }}"
-        host_filter: "{{ item.host_filter|default(omit) }}"
-        variables: "{{ item.variables|default(omit) }}"
-        insights_credential: "{{ item.insights_credential|default(omit) }}"
-        state: "{{ item.state }}"
-        tower_host: "{{ awx_host_url }}"
-        tower_username: "{{ awx_admin_user }}"
-        tower_password: "{{ awx_admin_password }}"
-        tower_verify_ssl: "{{ awx_ssl_verify }}"
-      with_items: "{{ awx_inventory }}"
-      run_once: yes
+- name: create inventory script
+  shell: awx-cli inventory_script create --name="{{ item.name }}" --organization="{{ item.organization }}" --script="{{ item.script }}"
+  loop: "{{ awx_inventory_scripts }}"
+  register: result
+  run_once: yes
+  changed_when: result.stdout is search("true")
 
-    - name: create inventory groups
-      shell: awx group create --name="{{ item.1 }}" --inventory="{{ item.0.name }}"
-      with_subelements:
-        - "{{ awx_inventory }}"
-        - groups
-        - skip_missing: yes
-      register: result
-      changed_when: result.stdout | search("true")
-      run_once: yes
+- name: create inventory sources
+  tower_inventory_source:
+    inventory: "{{ item.inventory }}"
+    name: "{{ item.name }}"
+    source: "{{ item.source }}"
+    state: "{{ item.state }}"
+    credential: "{{ item.credential|d(omit) }}"
+    description: "{{ item.description|d(omit) }}"
+    group_by: "{{ item.group_by|d(omit) }}"
+    instance_filters: "{{ item.instance_filters|d(omit) }}"
+    overwrite: "{{ item.overwrite|d(omit) }}"
+    overwrite_vars: "{{ item.overwrite_vars|d(omit) }}"
+    source_path: "{{ item.source_path|d(omit) }}"
+    source_project: "{{ item.source_project|d(omit) }}"
+    source_regions: "{{ item.source_regions|d(omit) }}"
+    source_script: "{{ item.source_script|d(omit) }}"
+    source_vars: "{{ item.source_vars|d(omit) }}"
+    timeout: "{{ item.timeout|d(omit) }}"
+    update_cache_timeout: "{{ item.update_cache_timeout|d(omit) }}"
+    update_on_launch: "{{ item.update_on_launch|d(omit) }}"
+    update_on_project_update: "{{ item.update_on_project_update|d(omit) }}"
+    validate_certs: "{{ item.validate_certs|d(omit) }}"
+    tower_host: "{{ awx_host_url }}"
+    tower_username: "{{ awx_admin_user }}"
+    tower_password: "{{ awx_admin_password }}"
+    tower_verify_ssl: "{{ awx_ssl_verify }}"
+  loop: "{{ awx_inventory_source }}"
+  run_once: yes
 
-    - name: create inventory hosts
-      tower_host:
-        name: "{{ item.1 }}"
-        description: "{{ item.0.description|default(omit) }}"
-        inventory: "{{ item.0.inventory }}"
-        enabled: "{{ item.0.enabled|default(omit) }}"
-        variables: "{{ item.0.variables|default(omit) }}"
-        state: "{{ item.0.state }}"
-        tower_host: "{{ awx_host_url }}"
-        tower_username: "{{ awx_admin_user }}"
-        tower_password: "{{ awx_admin_password }}"
-        tower_verify_ssl: "{{ awx_ssl_verify }}"
-      with_subelements:
-        - "{{ awx_inventory_hosts }}"
-        - group_items
-      run_once: yes
+- name: create job templates
+  tower_job_template:
+    name: "{{ item.name }}"
+    job_type: "{{ item.job_type }}"
+    playbook: "{{ item.playbook }}"
+    project: "{{ item.project }}"
+    state: "{{ item.state }}"
+    ask_credential: "{{ item.ask_credential|d(omit) }}"
+    ask_diff_mode: "{{ item.ask_diff_mode|d(omit) }}"
+    ask_extra_vars: "{{ item.ask_extra_vars|d(omit) }}"
+    ask_inventory: "{{ item.ask_inventory|d(omit) }}"
+    ask_job_type: "{{ item.ask_job_type|d(omit) }}"
+    ask_limit: "{{ item.ask_limit|d(omit) }}"
+    ask_skip_tags: "{{ item.ask_skip_tags|d(omit) }}"
+    ask_tags: "{{ item.ask_tags|d(omit) }}"
+    ask_verbosity: "{{ item.ask_verbosity|d(omit) }}"
+    become_enabled: "{{ item.become_enabled|d(omit) }}"
+    concurrent_jobs_enabled: "{{ item.concurrent_jobs_enabled|d(omit) }}"
+    credential: "{{ item.credential|d(omit) }}"
+    description: "{{ item.description|d(omit) }}"
+    diff_mode_enabled: "{{ item.diff_mode_enabled|d(omit) }}"
+    diff_mode_enabled: "{{ item.diff_mode_enabled|d(omit) }}"
+    extra_vars_path: "{{ item.extra_vars_path|d(omit) }}"
+    fact_caching_enabled: "{{ item.fact_caching_enabled|d(omit) }}"
+    force_handlers_enabled: "{{ item.force_handlers_enabled|d(omit) }}"
+    forks: "{{ item.forks|d(omit) }}"
+    host_config_key: "{{ item.host_config_key|d(omit) }}"
+    inventory: "{{ item.inventory|d(omit) }}"
+    job_tags: "{{ item.job_tags|d(omit) }}"
+    limit: "{{ item.limit|d(omit) }}"
+    skip_tags: "{{ item.skip_tags|d(omit) }}"
+    start_at_task: "{{ item.start_at_task|d(omit) }}"
+    survey_enabled: "{{ item.survey_enabled|d(omit) }}"
+    survey_spec: "{{ item.survey_spec|d(omit) }}"
+    vault_credential: "{{ item.vault_credential|d(omit) }}"
+    verbosity: "{{ item.verbosity|d(omit) }}"
+    tower_host: "{{ awx_host_url }}"
+    tower_username: "{{ awx_admin_user }}"
+    tower_password: "{{ awx_admin_password }}"
+    tower_verify_ssl: "{{ awx_ssl_verify }}"
+  loop: "{{ awx_job_templates }}"
+  run_once: yes
 
-    - name: assign hosts to groups
-      shell: awx host associate --host="{{ item.1 }}" --group="{{ item.0.group }}"
-      register: result
-      changed_when: result.stdout | search("true")
-      with_subelements:
-        - "{{ awx_inventory_hosts }}"
-        - group_items
-      run_once: yes
-
-    - name: create inventory script
-      shell: awx inventory_script create --name="{{ item.name }}" --organization="{{ item.organization }}" --script="{{ item.script }}"
-      with_items: "{{ awx_inventory_scripts }}"
-      register: result
-      run_once: yes
-      changed_when: result.stdout | search("true")
-
-    - name: create scm inventory sources
-      shell: awx inventory_source create --name="{{ item.1.name }}" --description="{{ item.1.description }}" --inventory="{{ item.0.name }}" --source="{{ item.1.source }}" --source-project="{{ item.1.source_project }}" --source-path="{{ item.1.source_path }}" --overwrite-vars=true
-      with_subelements:
-        - "{{ awx_inventory }}"
-        - sources
-        - skip_missing: yes
-      register: result
-      changed_when: result.stdout | search("true")
-      run_once: yes
-      when: item.1.source == "scm"
-
-    - name: create custom inventory sources
-      shell: awx inventory_source create --name="{{ item.1.name }}" --description="{{ item.1.description }}" --inventory="{{ item.0.name }}" --source="{{ item.1.source }}" --source-script="{{ item.1.source_script }}" --overwrite-vars=true
-      with_subelements:
-        - "{{ awx_inventory }}"
-        - sources
-        - skip_missing: yes
-      register: result
-      changed_when: result.stdout | search("true")
-      run_once: yes
-      when: item.1.source == "custom"
-
-    # - name: create job templates
-    #   tower_job_template:
-    #     name: "{{ item.name }}"
-    #     state: "{{ item.state }}"
-    #     description: "{{ item.description|default(omit) }}"
-    #     job_type: "{{ item.job_type }}"
-    #     inventory: "{{ item.inventory }}"
-    #     project: "{{ item.project }}"
-    #     playbook: "{{ item.playbook }}"
-    #     tower_host: "{{ awx_host_url }}"
-    #     tower_username: "{{ awx_admin_user }}"
-    #     tower_password: "{{ awx_admin_password }}"
-    #     tower_verify_ssl: "{{ awx_ssl_verify }}"
-    #   with_items: "{{ awx_job_templates }}"
-    #   run_once: yes
-
-    - name: create job templates
-      shell: awx job_template create --name="{{ item.name }}"{% if item.description is defined %} --description="{{ item.description }}"{% endif %}{% if item.inventory is defined %} --inventory="{{ item.inventory }}"{% endif %} --project="{{ item.project }}" --playbook="{{ item.playbook }}"{% if item.inventory is defined %} --credential="{{ item.machine_credential }}"{% endif %}{% if item.vault_credential is defined %} --vault-credential="{{ item.vault_credential }}"{% endif %}{% if item.use_fact_cache is defined %} --use-fact-cache="{{ item.use_fact_cache }}"{% endif %}
-      with_items: "{{ awx_job_templates }}"
-      register: result
-      run_once: yes
-
-    # - name: assign credentials to job templates
-    #   shell: awx job_template associate_credential --job-template="{{ item.0.name }}" --credential="{{ item.1 }}"
-    #   with_subelements:
-    #     - "{{ awx_job_templates }}"
-    #     - credentials
-    #   register: result
-    #   run_once: yes
+# - name: assign credentials to job templates
+#   shell: awx-cli job_template associate_credential --job-template="{{ item.0.name }}" --credential="{{ item.1 }}"
+#   loop: "{{ awx_job_templates|subelements('credentials') }}"
+#   register: result
+#   run_once: yes

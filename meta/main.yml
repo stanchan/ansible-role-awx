@@ -9,6 +9,9 @@ galaxy_info:
   # github_branch:
 
   platforms:
+    - name: Alpine
+      versions:
+        - all
     - name: EL
       versions:
         - 8
