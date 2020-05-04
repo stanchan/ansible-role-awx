@@ -128,7 +128,3 @@
   ignore_errors: no
   register: installer_results
   when: not docker_result.exists
-
-# - name: Start docker services
-#   docker_service:
-#     project_src: "{{ awx_docker_compose_dir }}"

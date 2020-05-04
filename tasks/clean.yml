@@ -1,40 +1,74 @@
 ---
-- name: Cleanup awx
-  hosts: awx
-  tasks:
-    - name: deploy initial tower cli config file
-      copy:
-        content: |
-                 [general]
-                 host = {{ awx_host_url }}
-                 username = admin
-                 password = password
-                 verify_ssl = {{ awx_ssl_verify }}
-        dest: "{{ awx_config }}"
-        owner: root
-        group: root
-        mode: 0600
+- name: deploy initial awx cli credentials file
+  copy:
+    content: |
+             ---
+             host: {{ awx_host_url }}
+             username: admin
+             password: password
+             insecure: yes
+    dest: "{{ awx_config }}"
+    owner: root
+    group: root
+    mode: 0600
 
-    - name: remove default organization
-      shell: awx organization delete --name "Default" --insecure
-      register: result
-      changed_when: result.stdout | search("true")
-      run_once: yes
+- name: remove demo job template
+  tower_job_template:
+    name: Demo Job Template
+    job_type: run
+    playbook: hello_world.yml
+    project: Demo Project
+    state: absent
+    tower_host: "{{ awx_host_url }}"
+    tower_username: "{{ awx_admin_user }}"
+    tower_password: "{{ awx_admin_password }}"
+    tower_verify_ssl: "{{ awx_ssl_verify }}"
+  ignore_errors: yes
+  run_once: yes
 
-    - name: remove demo project
-      shell: awx project delete --name "Demo Project" --insecure
-      register: result
-      changed_when: result.stdout | search("true")
-      run_once: yes
+- name: remove demo credential
+  tower_credential:
+    name: Demo Credential
+    kind: ssh
+    organization: Default
+    state: absent
+    tower_host: "{{ awx_host_url }}"
+    tower_username: "{{ awx_admin_user }}"
+    tower_password: "{{ awx_admin_password }}"
+    tower_verify_ssl: "{{ awx_ssl_verify }}"
+  ignore_errors: yes
+  run_once: yes
 
-    - name: remove demo credential
-      shell: awx credential delete --name "Demo Credential" --insecure
-      register: result
-      changed_when: result.stdout | search("true")
-      run_once: yes
+- name: remove demo inventory
+  tower_inventory:
+    name: Demo Inventory
+    organization: Default
+    state: absent
+    tower_host: "{{ awx_host_url }}"
+    tower_username: "{{ awx_admin_user }}"
+    tower_password: "{{ awx_admin_password }}"
+    tower_verify_ssl: "{{ awx_ssl_verify }}"
+  ignore_errors: yes
+  run_once: yes
 
-    - name: remove demo job template
-      shell: awx job_template delete --name "Demo Job Template" --insecure
-      register: result
-      changed_when: result.stdout | search("true")
-      run_once: yes
+- name: remove demo project
+  tower_project:
+    name: Demo Project
+    state: absent
+    tower_host: "{{ awx_host_url }}"
+    tower_username: "{{ awx_admin_user }}"
+    tower_password: "{{ awx_admin_password }}"
+    tower_verify_ssl: "{{ awx_ssl_verify }}"
+  ignore_errors: yes
+  run_once: yes
+
+- name: remove default organization
+  tower_organization:
+    name: Default
+    state: absent
+    tower_host: "{{ awx_host_url }}"
+    tower_username: "{{ awx_admin_user }}"
+    tower_password: "{{ awx_admin_password }}"
+    tower_verify_ssl: "{{ awx_ssl_verify }}"
+  ignore_errors: yes
+  run_once: yes

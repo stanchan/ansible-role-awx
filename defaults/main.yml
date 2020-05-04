@@ -8,6 +8,7 @@ awx_install_path: /opt
 awx_python_version: 3.8.2
 awx_python_bin: "{{ awx_default_conda_path }}/bin/python"
 awx_default_conda_path: "{{ miniconda_env | selectattr('default', 'equalto', true) | map(attribute='path') | list | first }}/conda/miniconda3/envs/{{ miniconda_env | selectattr('default', 'equalto', true) | map(attribute='env') | map(attribute='name') | list | first }}"
+# End
 
 awx_cli_bin: awx
 awx_dockerhub_base: stanchan
@@ -37,7 +38,7 @@ awx_search_domains: shift-labs.com
 
 awx_project_data_dir: /var/lib/awx/projects
 #awx_ca_trust_dir: /etc/pki/ca-trust/source/anchors
-awx_config: /root/.tower_cli.cfg
+awx_config: /root/credentials.yaml
 awx_inventory_dir: "{{ awx_project_data_dir }}/inventory"
 awx_default_attributes_file: "{{ awx_inventory_dir }}/default_attributes.yml"
 
