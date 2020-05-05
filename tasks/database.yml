@@ -1,0 +1,15 @@
+---
+- name: Create database user
+  postgresql_user:
+    db: "{{ postgres_db }}"
+    name: "{{ postgres_user }}"
+    password: "{{ postgres_password }}"
+    priv: ALL
+    login_host: "{{ postgres_host }}"
+    port: "{{ postgres_port }}"
+    login_user: "{{ postgres_admin_user }}"
+    login_password: "{{ postgres_admin_password }}"
+    expires: infinity
+    state: present
+  no_log: yes
+  run_once: yes
