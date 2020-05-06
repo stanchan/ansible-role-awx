@@ -7,7 +7,7 @@ services:
     depends_on:
       - rabbitmq
       - memcached
-      {% if postgres_hostname is not defined %}
+      {% if pg_hostname is not defined %}
       - postgres
       {% endif %}
     ports:
@@ -18,32 +18,32 @@ services:
     hostname: {{ awx_web_hostname }}
     user: root
     restart: unless-stopped
-    {% if (awx_alternate_dns_servers is defined) and (',' in awx_alternate_dns_servers) %}
+    {% if awx_alternate_dns_servers is defined and ',' in awx_alternate_dns_servers %}
     {% set awx_alternate_dns_servers_list = awx_alternate_dns_servers.split(',') %}
     dns:
     {% for awx_alternate_dns_server in awx_alternate_dns_servers_list %}
       - {{ awx_alternate_dns_server }}
     {% endfor %}
     {% elif awx_alternate_dns_servers is defined %}
-    dns: "{{ awx_alternate_dns_servers }}"
+    dns: {{ awx_alternate_dns_servers }}
     {% endif %}
-    {% if (awx_container_search_domains is defined) and (',' in awx_container_search_domains) %}
+    {% if awx_container_search_domains is defined and ',' in awx_container_search_domains %}
     {% set awx_container_search_domains_list = awx_container_search_domains.split(',') %}
     dns_search:
     {% for awx_container_search_domain in awx_container_search_domains_list %}
       - {{ awx_container_search_domain }}
     {% endfor %}
     {% elif awx_container_search_domains is defined %}
-    dns_search: "{{ awx_container_search_domains }}"
+    dns_search: {{ awx_container_search_domains }}
     {% endif %}
-    {% if (awx_extra_hosts is defined) and (',' in awx_extra_hosts) %}
+    {% if awx_extra_hosts is defined and ',' in awx_extra_hosts %}
     {% set awx_extra_hosts_list = awx_extra_hosts.split(',') %}
     extra_hosts:
     {% for awx_extra_host in awx_extra_hosts_list %}
       - {{ awx_extra_host }}
     {% endfor %}
-    {% elif awx_extra_hosts is defined %}
-    extra_hosts: {{ awx_extra_hosts }}
+    {% elif awx_extra_hosts is defined and awx_extra_hosts|length %}
+    extra_hosts: [ {{ awx_extra_hosts }} ]
     {% endif %}
     environment:
       http_proxy: {{ http_proxy | default('') }}
@@ -85,32 +85,32 @@ services:
       {% if pg_hostname is not defined %}
       - postgres
       {% endif %}
-    {% if (awx_alternate_dns_servers is defined) and (',' in awx_alternate_dns_servers) %}
+    {% if awx_alternate_dns_servers is defined and ',' in awx_alternate_dns_servers %}
     {% set awx_alternate_dns_servers_list = awx_alternate_dns_servers.split(',') %}
     dns:
     {% for awx_alternate_dns_server in awx_alternate_dns_servers_list %}
       - {{ awx_alternate_dns_server }}
     {% endfor %}
     {% elif awx_alternate_dns_servers is defined %}
-    dns: "{{ awx_alternate_dns_servers }}"
+    dns: {{ awx_alternate_dns_servers }}
     {% endif %}
-    {% if (awx_container_search_domains is defined) and (',' in awx_container_search_domains) %}
+    {% if awx_container_search_domains is defined and ',' in awx_container_search_domains %}
     {% set awx_container_search_domains_list = awx_container_search_domains.split(',') %}
     dns_search:
     {% for awx_container_search_domain in awx_container_search_domains_list %}
       - {{ awx_container_search_domain }}
     {% endfor %}
     {% elif awx_container_search_domains is defined %}
-    dns_search: "{{ awx_container_search_domains }}"
+    dns_search: {{ awx_container_search_domains }}
     {% endif %}
-    {% if (awx_extra_hosts is defined) and (',' in awx_extra_hosts) %}
+    {% if awx_extra_hosts is defined and ',' in awx_extra_hosts %}
     {% set awx_extra_hosts_list = awx_extra_hosts.split(',') %}
     extra_hosts:
     {% for awx_extra_host in awx_extra_hosts_list %}
       - {{ awx_extra_host }}
     {% endfor %}
-    {% elif awx_extra_hosts is defined %}
-    extra_hosts: {{ awx_extra_hosts }}
+    {% elif awx_extra_hosts is defined and awx_extra_hosts|length %}
+    extra_hosts: [ {{ awx_extra_hosts }} ]
     {% endif %}
     environment:
       http_proxy: {{ http_proxy | default('') }}

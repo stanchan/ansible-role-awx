@@ -53,6 +53,7 @@ awx_custom_assets: 'False'
 
 awx_bootstrap: yes
 
+# This section should be copied over to your inventory if you need to customize the AWX build variables
 awx_inventory_vars:
   all:vars:
     host_port: "{{ awx_host_port }}"
@@ -82,7 +83,7 @@ awx_inventory_vars:
     awx_task_hostname: "{{ awx_task_host }}"
     awx_alternate_dns_servers: "{{ awx_alternate_dns_servers | quote }}"
     awx_container_search_domains: "{{ awx_container_search_domains | quote }}"
-    awx_extra_hosts: "{{ awx_extra_hosts | quote }}"
+    awx_extra_hosts: "{{ awx_extra_hosts }}"
     awx_network: "{{ awx_network }}"
     awx_network_type: "{{ awx_network_type }}"
     awx_ssl_enabled: "{{ awx_ssl_enabled }}"
@@ -228,6 +229,7 @@ miniconda_env:
         - "python={{ awx_python_version }}"
         - pip:
           - ansible
+          - ansible-tower-cli
           - ansible-vault
           - cffi
           - docker-compose
