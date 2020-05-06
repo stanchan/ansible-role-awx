@@ -41,10 +41,7 @@ services:
       - {{ awx_extra_host }}
     {% endfor %}
     {% elif awx_extra_hosts is defined %}
-    extra_hosts:
-    {% for awx_extra_host in awx_extra_hosts %}
-      - {{ awx_extra_host }}
-    {% endfor %}
+    extra_hosts: "{{ awx_extra_hosts }}"
     {% endif %}
     environment:
       http_proxy: {{ http_proxy | default('') }}
@@ -112,10 +109,7 @@ services:
       - {{ awx_extra_host }}
     {% endfor %}
     {% elif awx_extra_hosts is defined %}
-    extra_hosts:
-    {% for awx_extra_host in awx_extra_hosts %}
-      - {{ awx_extra_host }}
-    {% endfor %}
+    extra_hosts: "{{ awx_extra_hosts }}"
     {% endif %}
     environment:
       http_proxy: {{ http_proxy | default('') }}
