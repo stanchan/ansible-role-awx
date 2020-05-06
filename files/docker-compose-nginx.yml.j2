@@ -43,7 +43,7 @@ services:
       - {{ awx_extra_host }}
     {% endfor %}
     {% elif awx_extra_hosts is defined %}
-    extra_hosts: "{{ awx_extra_hosts }}"
+    extra_hosts: {{ awx_extra_hosts }}
     {% endif %}
     environment:
       http_proxy: {{ http_proxy | default('') }}
@@ -110,7 +110,7 @@ services:
       - {{ awx_extra_host }}
     {% endfor %}
     {% elif awx_extra_hosts is defined %}
-    extra_hosts: "{{ awx_extra_hosts }}"
+    extra_hosts: {{ awx_extra_hosts }}
     {% endif %}
     environment:
       http_proxy: {{ http_proxy | default('') }}
