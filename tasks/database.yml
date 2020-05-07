@@ -1,15 +1,27 @@
 ---
-- name: Create database user
-  postgresql_user:
-    db: "{{ postgres_db }}"
-    name: "{{ postgres_user }}"
-    password: "{{ postgres_password }}"
-    priv: ALL
-    login_host: "{{ postgres_host }}"
-    port: "{{ postgres_port }}"
-    login_user: "{{ postgres_admin_user }}"
-    login_password: "{{ postgres_admin_password }}"
-    expires: infinity
-    state: present
-  no_log: yes
-  run_once: yes
+- block:
+  - name: Create database
+    postgresql_db:
+      name: "{{ postgres_db }}"
+      login_host: "{{ postgres_host }}"
+      port: "{{ postgres_port }}"
+      login_user: "{{ postgres_admin_user }}"
+      login_password: "{{ postgres_admin_password }}"
+      state: present
+    run_once: yes
+
+  - name: Create database user
+    postgresql_user:
+      db: "{{ postgres_db }}"
+      name: "{{ postgres_user }}"
+      password: "{{ postgres_password }}"
+      priv: ALL
+      login_host: "{{ postgres_host }}"
+      port: "{{ postgres_port }}"
+      login_user: "{{ postgres_admin_user }}"
+      login_password: "{{ postgres_admin_password }}"
+      expires: infinity
+      state: present
+    no_log: yes
+    run_once: yes
+  when: postgres_host is defined

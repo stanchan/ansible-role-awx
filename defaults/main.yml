@@ -53,7 +53,8 @@ awx_custom_assets: 'False'
 
 awx_bootstrap: yes
 
-# This section should be copied over to your inventory if you need to customize the AWX build variables
+# This section should be copied over to your inventory if you need to customize the AWX build variables.
+# Remove vars that are not being used!
 awx_inventory_vars:
   all:vars:
     host_port: "{{ awx_host_port }}"
@@ -90,6 +91,7 @@ awx_inventory_vars:
     awx_ssl_cert_file: "{{ awx_ssl_cert_file }}"
     awx_ssl_key_file: "{{ awx_ssl_key_file }}"
     awx_official: "{{ awx_custom_assets }}"
+# End
 
 rabbitmq_version: 3.7.4
 rabbitmq_image: "ansible/awx_rabbitmq:{{rabbitmq_version}}"

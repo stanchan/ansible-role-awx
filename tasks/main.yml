@@ -3,5 +3,8 @@
 - name: Install apps
   include_tasks: setup.yml
 
+- name: Setup database
+  include_tasks: database.yml
+
 - name: Setup configs
   include_tasks: config.yml
