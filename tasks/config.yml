@@ -3,11 +3,11 @@
   uri:
     url: "{{ awx_host_url }}/api/v2/ping/"
     method: GET
-    status: 200
+    status_code: 200
   register: ping_result
   until: ping_result.status == 200
-  retries: 30
-  delay: 60
+  retries: 10
+  delay: 30
 
 - name: change default awx admin password
   tower_user:
@@ -319,7 +319,6 @@
     update_cache_timeout: "{{ item.update_cache_timeout|d(omit) }}"
     update_on_launch: "{{ item.update_on_launch|d(omit) }}"
     update_on_project_update: "{{ item.update_on_project_update|d(omit) }}"
-    validate_certs: "{{ item.validate_certs|d(omit) }}"
     tower_host: "{{ awx_host_url }}"
     tower_username: "{{ awx_admin_user }}"
     tower_password: "{{ awx_admin_password }}"
