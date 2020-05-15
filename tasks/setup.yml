@@ -62,12 +62,6 @@
       dest: "{{ awx_install_path }}/awx/installer/roles/local_docker/tasks/compose.yml"
       mode: 0644
 
-  - name: Update non-nginx docker-compose.yml
-    copy:
-      src: docker-compose.yml.j2
-      dest: "{{ awx_install_path }}/awx/installer/roles/local_docker/templates/docker-compose.yml.j2"
-      mode: 0644
-
   - name: Update non-nginx Caddyfile.j2
     template:
       src: Caddyfile.j2
@@ -75,12 +69,11 @@
       mode: 0644
   when: not awx_enable_nginx|bool
 
-- name: Update nignx docker-compose.yml template
-  copy:
-    src: docker-compose-nginx.yml.j2
+- name: Update docker-compose.yml template
+  template:
+    src: docker-compose.yml.j2
     dest: "{{ awx_install_path }}/awx/installer/roles/local_docker/templates/docker-compose.yml.j2"
     mode: 0644
-  when: awx_enable_nginx|bool
 
 - name: Create SECRET_KEY file
   copy:

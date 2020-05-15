@@ -12,9 +12,9 @@ awx_default_conda_path: "{{ miniconda_env | selectattr('default', 'equalto', tru
 
 awx_cli_bin: awx
 awx_dockerhub_base: stanchan
-awx_web_host: awxweb
+awx_web_hostname: awxweb
 awx_web_docker_image: "{{ awx_dockerhub_base }}/awx_web:{{ awx_version }}"
-awx_task_host: awx
+awx_task_hostname: awx
 awx_task_docker_image: "{{ awx_dockerhub_base }}/awx_task:{{ awx_version }}"
 
 awx_git_url: https://github.com/ansible/awx.git
@@ -40,7 +40,8 @@ awx_extra_hosts: ""
 
 awx_project_data_dir: /var/lib/awx/projects
 #awx_ca_trust_dir: /etc/pki/ca-trust/source/anchors
-awx_config: /root/credentials.yaml
+awx_tower_cli: /root/.tower_cli.cfg
+awx_credentials_file: /root/credentials.yaml
 awx_inventory_dir: "{{ awx_project_data_dir }}/inventory"
 awx_default_attributes_file: "{{ awx_inventory_dir }}/default_attributes.yml"
 
@@ -80,8 +81,8 @@ awx_inventory_vars:
     project_data_dir: "{{ awx_project_data_dir }}"
     create_preload_data: "{{ awx_create_preload_data }}"
     docker_compose_dir: "{{ awx_docker_compose_dir }}"
-    awx_web_hostname: "{{ awx_web_host }}"
-    awx_task_hostname: "{{ awx_task_host }}"
+    awx_web_hostname: "{{ awx_web_hostname }}"
+    awx_task_hostname: "{{ awx_task_hostname }}"
     awx_alternate_dns_servers: "{{ awx_alternate_dns_servers | quote }}"
     awx_container_search_domains: "{{ awx_container_search_domains | quote }}"
     awx_extra_hosts: "{{ awx_extra_hosts }}"

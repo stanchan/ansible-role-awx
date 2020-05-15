@@ -1,4 +1,14 @@
 ---
+- name: "wait for api ready"
+  uri:
+    url: "{{ awx_host_url }}/api/v2/ping/"
+    method: GET
+    status: 200
+  register: ping_result
+  until: ping_result.status == 200
+  retries: 30
+  delay: 60
+
 - name: change default awx admin password
   tower_user:
     username: "{{ awx_admin_user }}"
@@ -11,22 +21,40 @@
     tower_host: "{{ awx_host_url }}"
     tower_username: admin
     tower_password: password
-    tower_verify_ssl: "{{ awx_ssl_verify }}"
+    validate_certs: "{{ awx_ssl_verify }}"
   run_once: yes
   ignore_errors: yes
 
-- name: deploy initial awx cli credentials file
+- name: deploy tower cli credentials file
+  copy:
+    content: |
+            [general]
+            host = {{ awx_host_url }}
+            username = {{ awx_admin_user }}
+            password = {{ awx_admin_password }}
+            verify_ssl = {{ awx_ssl_verify }}
+    dest: "{{ awx_tower_cli }}"
+    owner: root
+    group: root
+    mode: 0600
+
+- name: deploy awx cli credentials file
   copy:
     content: |
              ---
              host: {{ awx_host_url }}
-             username: admin
-             password: password
-             insecure: yes
-    dest: "{{ awx_config }}"
+             username: "{{ awx_admin_user }}"
+             password: "{{ awx_admin_password }}"
+             insecure: "{( 'false' if awx_ssl_verify else 'true' }}"
+    dest: "{{ awx_credentials_file }}"
     owner: root
     group: root
     mode: 0600
+
+- name: generate awx command
+  set_fact:
+    awx_cli: "{{ awx_default_conda_path }}/bin/awx --conf.host '{{ awx_host_url }}' --conf.username '{{ awx_admin_user }}' --conf.password '{{ awx_admin_password }}'{% if not awx_ssl_verify %} --conf.insecure{% endif %}"
+  no_log: yes
 
 - name: create organizations
   tower_organization:
@@ -36,7 +64,7 @@
     tower_host: "{{ awx_host_url }}"
     tower_username: "{{ awx_admin_user }}"
     tower_password: "{{ awx_admin_password }}"
-    tower_verify_ssl: "{{ awx_ssl_verify }}"
+    validate_certs: "{{ awx_ssl_verify }}"
   loop: "{{ awx_orgs|dict2items }}"
   run_once: yes
 
@@ -49,7 +77,7 @@
     tower_host: "{{ awx_host_url }}"
     tower_username: "{{ awx_admin_user }}"
     tower_password: "{{ awx_admin_password }}"
-    tower_verify_ssl: "{{ awx_ssl_verify }}"
+    validate_certs: "{{ awx_ssl_verify }}"
   loop: "{{ awx_teams|dict2items }}"
   run_once: yes
 
@@ -66,13 +94,13 @@
     tower_host: "{{ awx_host_url }}"
     tower_username: "{{ awx_admin_user }}"
     tower_password: "{{ awx_admin_password }}"
-    tower_verify_ssl: "{{ awx_ssl_verify }}"
+    validate_certs: "{{ awx_ssl_verify }}"
   loop: "{{ awx_users }}"
   no_log: no
   run_once: yes
 
 - name: assign users to teams
-  shell: "{{ awx_default_conda_path }}/bin/awx --conf.host '{{ awx_host_url }}' --conf.username '{{ awx_admin_user }}' --conf.password '{{ awx_admin_password }}' --conf.insecure users grant '{{ item.0.username }}' --team '{{ item.1.name }}' --role '{{ item.1.role }}'"
+  shell: "{{ awx_cli }} users grant '{{ item.0.username }}' --team '{{ item.1.name }}' --role '{{ item.1.role }}'"
   loop: "{{ awx_users|subelements('teams') }}"
   register: result
   changed_when: result.stdout is search("true")
@@ -109,7 +137,7 @@
     tower_host: "{{ awx_host_url }}"
     tower_username: "{{ awx_admin_user }}"
     tower_password: "{{ awx_admin_password }}"
-    tower_verify_ssl: "{{ awx_ssl_verify }}"
+    validate_certs: "{{ awx_ssl_verify }}"
   loop: "{{ awx_credentials }}"
   no_log: no
   run_once: yes
@@ -134,7 +162,7 @@
     tower_host: "{{ awx_host_url }}"
     tower_username: "{{ awx_admin_user }}"
     tower_password: "{{ awx_admin_password }}"
-    tower_verify_ssl: "{{ awx_ssl_verify }}"
+    validate_certs: "{{ awx_ssl_verify }}"
   loop: "{{ awx_projects }}"
   run_once: yes
   when: item.local_path is not defined
@@ -142,7 +170,7 @@
 # - name: update scm projects
 #   shell: "{{ awx_default_conda_path }}/bin/awx project_update --name='{{ item.name }}' --wait"
 #   environment:
-#     AWXKIT_CREDENTIAL_FILE: "{{ awx_config }}"
+#     AWXKIT_CREDENTIAL_FILE: "{{ awx_credentials_file }}"
 #   loop: "{{ awx_projects }}"
 #   run_once: yes
 #   when: item.scm_type == "git" and awx_bootstrap
@@ -168,7 +196,7 @@
     tower_host: "{{ awx_host_url }}"
     tower_username: "{{ awx_admin_user }}"
     tower_password: "{{ awx_admin_password }}"
-    tower_verify_ssl: "{{ awx_ssl_verify }}"
+    validate_certs: "{{ awx_ssl_verify }}"
   loop: "{{ awx_inventory }}"
   run_once: yes
 
@@ -190,7 +218,7 @@
     tower_host: "{{ awx_host_url }}"
     tower_username: "{{ awx_admin_user }}"
     tower_password: "{{ awx_admin_password }}"
-    tower_verify_ssl: "{{ awx_ssl_verify }}"
+    validate_certs: "{{ awx_ssl_verify }}"
   loop: "{{ awx_groups }}"
   run_once: yes
 
@@ -205,7 +233,7 @@
     tower_host: "{{ awx_host_url }}"
     tower_username: "{{ awx_admin_user }}"
     tower_password: "{{ awx_admin_password }}"
-    tower_verify_ssl: "{{ awx_ssl_verify }}"
+    validate_certs: "{{ awx_ssl_verify }}"
   loop: "{{ awx_inventory_hosts|subelements('hosts') }}"
   run_once: yes
 
@@ -244,7 +272,19 @@
       {% endfor %}
       ]
 
-- name: create inventory script
+- name: get inventory script
+  uri:
+    url: "{{ awx_host_url }}/api/v2/inventory_scripts/"
+    user: "{{ awx_admin_user }}"
+    password: "{{ awx_admin_password }}"
+    method: GET
+    force_basic_auth: yes
+    status_code: 200
+    headers:
+      Content-Type: "application/json"
+  register: awx_inventory_scripts_results
+
+- name: create inventory scripts
   uri:
     url: "{{ awx_host_url }}/api/v2/inventory_scripts/"
     user: "{{ awx_admin_user }}"
@@ -252,10 +292,11 @@
     method: POST
     body: "{{ item }}"
     force_basic_auth: yes
-    status_code: 201
+    status_code: 201,400
     return_content: yes
     body_format: json
   loop: "{{ awx_inventory_scripts_list }}"
+  run_once: yes
 
 - name: create inventory sources
   tower_inventory_source:
@@ -282,7 +323,7 @@
     tower_host: "{{ awx_host_url }}"
     tower_username: "{{ awx_admin_user }}"
     tower_password: "{{ awx_admin_password }}"
-    tower_verify_ssl: "{{ awx_ssl_verify }}"
+    validate_certs: "{{ awx_ssl_verify }}"
   loop: "{{ awx_inventory_source }}"
   run_once: yes
 
@@ -307,7 +348,6 @@
     credential: "{{ item.credential|d(omit) }}"
     description: "{{ item.description|d(omit) }}"
     diff_mode_enabled: "{{ item.diff_mode_enabled|d(omit) }}"
-    diff_mode_enabled: "{{ item.diff_mode_enabled|d(omit) }}"
     extra_vars_path: "{{ item.extra_vars_path|d(omit) }}"
     fact_caching_enabled: "{{ item.fact_caching_enabled|d(omit) }}"
     force_handlers_enabled: "{{ item.force_handlers_enabled|d(omit) }}"
@@ -325,14 +365,14 @@
     tower_host: "{{ awx_host_url }}"
     tower_username: "{{ awx_admin_user }}"
     tower_password: "{{ awx_admin_password }}"
-    tower_verify_ssl: "{{ awx_ssl_verify }}"
+    validate_certs: "{{ awx_ssl_verify }}"
   loop: "{{ awx_job_templates }}"
   run_once: yes
 
 # - name: assign credentials to job templates
 #   shell: "{{ awx_default_conda_path }}/bin/awx job_template associate_credential --job-template='{{ item.0.name }}' --credential='{{ item.1 }}'"
 #   environment:
-#     AWXKIT_CREDENTIAL_FILE: "{{ awx_config }}"
+#     AWXKIT_CREDENTIAL_FILE: "{{ awx_credentials_file }}"
 #   loop: "{{ awx_job_templates|subelements('credentials') }}"
 #   register: result
 #   run_once: yes

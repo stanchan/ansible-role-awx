@@ -1,13 +1,13 @@
 ---
-- name: deploy initial awx cli credentials file
+- name: deploy initial tower cli credentials file
   copy:
     content: |
-             ---
-             host: {{ awx_host_url }}
-             username: admin
-             password: password
-             insecure: yes
-    dest: "{{ awx_config }}"
+            [general]
+            host = {{ awx_host_url }}
+            username = admin
+            password = password
+            verify_ssl = False
+    dest: "{{ awx_tower_cli }}"
     owner: root
     group: root
     mode: 0600
